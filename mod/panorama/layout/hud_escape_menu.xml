@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BabelTower v3 — Escape Menu 布局覆盖(QOLLOCK 生产模式)
+  底稿 = 游戏当前版 hud_escape_menu.vxml_c 的反编译重建(结构逐行保留),外加:
+    1. <styles> 增加 lct_settings.vcss_c(样式必须与使用它的 UI 同 context 才生效)
+    2. <scripts> 增加 lct_settings_ui.vjs_c(控件逻辑)+ lct_settings.vjs_c(窗口开关宿主)
+    3. EscapeBackground / EscapeButton / oncancel 先关我们的窗口再走原行为
+    4. SubOptions 增加"BabelTower 翻译"入口按钮(独立按钮,不碰原生设置页)
+    5. 末尾声明 LCTSettingsWindow 静态窗口壳(内容 = 原 lct_settings_tab.xml 的行,
+       onactivate 一律走 $.X 守卫形式;面板可见性由 .LCTOpen 类驱动)
+  全程零 BLoadLayout、零运行时跨 context 注入(QOLLOCK 反编译实证:BLoadLayout 出现 0 次)。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/citadel_base_styles.vcss_c" />
+		<include src="s2r://panorama/styles/hud_escape_menu.vcss_c" />
+		<include src="s2r://panorama/styles/lct_settings.vcss_c" />
+	</styles>
+	<scripts>
+		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
+		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
+	</scripts>
+	<CitadelHudEscapeMenu oncancel="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); } CitadelResumePlaying();">
+		<Panel id="EscapeBackground" onactivate="if ($.LCTIsSettingsOpen &amp;&amp; $.LCTIsSettingsOpen()) { $.LCTCloseSettingsWindow(true); } else { CitadelResumePlaying(); }" />
+		<Panel id="LeftStripeBlur" />
+		<Panel id="LeftStripe" hittest="false">
+			<Panel id="Menu" hittest="false">
+				<Panel id="ContextualMenu">
+					<Panel class="MatchmakingOptions OptionGroup">
+						<Button id="matchmakingLeaveQueue" class="nav_menu_item primary leavequeue" onactivate="CitadelLeaveMatchmaking()">
+							<Label text="#menu_leave_queue" class="menuButtonLabel" antialias="true" />
+						</Button>
+						<Button id="matchmakingEditRoster" class="nav_menu_item primary" onactivate="CitadelEditMatchmakingRoster()">
+							<Panel class="MenuIcon" />
+							<Label text="#menu_edit_roster" class="menuButtonLabel" />
+						</Button>
+					</Panel>
+					<Panel class="ReconnectOptions OptionGroup">
+						<Button id="reconnectRejoin" class="nav_menu_item primary" onactivate="CitadelReconnect()" onmouseover="UIShowTextTooltip( #Citadel_Dashboard_RejoinTooltip )" onmouseout="UIHideTextTooltip()">
+							<Label text="#menu_rejoin" class="menuButtonLabel" />
+						</Button>
+						<Button id="reconnectAbandon" class="nav_menu_item primary endsession" onactivate="CitadelConfirmAbandonGame()">
+							<Label text="{s:reconnect_abandon_action}" class="menuButtonLabel" />
+						</Button>
+					</Panel>
+					<Button id="disconnect" class="nav_menu_item primary" onactivate="CitadelDisconnectFromGame()">
+						<Label text="#menu_disconnect" class="menuButtonLabel" />
+					</Button>
+					<Button id="abandon" class="nav_menu_item primary endsession" onactivate="CitadelConfirmAbandonGame()">
+						<Label text="{s:abandon_action}" class="menuButtonLabel" />
+					</Button>
+					<Button id="Unstick" class="nav_menu_item minor" onactivate="CitadelConCommand( 'unstick' );" onmouseover="CitadelUIShowTextTooltip( '#DevMenu_UnstickHeroTooltip' )" onmouseout="CitadelUIHideTextTooltip()">
+						<Label text="#DevMenu_UnstickHero" class="menuButtonLabel" />
+					</Button>
+				</Panel>
+				<Button id="changehero" class="nav_menu_item primary" onactivate="CitadelEscapeMenuChangeHero()">
+					<Label text="#menu_changehero" class="menuButtonLabel" />
+				</Button>
+				<Panel id="SubOptions">
+					<Panel class="FeedbackRow">
+						<Button id="PlayerFeedback" class="nav_menu_item minor" onactivate="CitadelShowPlayerFeedbackPopup()">
+							<Label text="#Citadel_PlayerFeedback_Title" class="menuButtonLabel" />
+						</Button>
+					</Panel>
+					<Panel class="SettingsRow">
+						<Button id="LCTModSettingsBtn" class="nav_menu_item minor" onactivate="if ($.LCTToggleSettingsWindow) { $.LCTToggleSettingsWindow(); }">
+							<Label text="BabelTower 翻译" class="menuButtonLabel" />
+							<Image id="LCTSettingsGearIcon" class="smallIcon" src="s2r://panorama/images/icons/icon_gear.vsvg" />
+						</Button>
+					</Panel>
+					<Panel class="SettingsRow">
+						<Button id="settings" class="nav_menu_item minor" onactivate="CitadelSettings()">
+							<Panel class="smallIcon GearIcon" />
+							<Label text="#menu_settings" class="menuButtonLabel" />
+						</Button>
+						<Button id="QuickMute" class="nav_menu_item minor" onactivate="CitadelMuteButtonClicked();" onmouseover="CitadelUIShowTextTooltip( '#citadel_mute_game_audio' )" onmouseout="CitadelUIHideTextTooltip()" />
+					</Panel>
+					<Button id="quit" onactivate="CitadelQuitConfirm()">
+						<Label text="#menu_exit_deadlock" />
+					</Button>
+				</Panel>
+			</Panel>
+		</Panel>
+		<CitadelPrivilegedFeatures id="PrivilegedFeatures" />
+		<CitadelBindingButton id="EscapeButton" action="MenuBack" onactivate="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); } CitadelResumePlaying();" text="#menu_resume" />
+		<Panel id="RightSideBlur" hittest="false" />
+		<Panel id="RightSide" hittest="false">
+			<Panel id="PartySpacer" />
+			<Panel class="FriendsOrPlayersTabs">
+				<Panel class="Center">
+					<TabButton id="FriendsTab" class="FriendsOrPlayersButton" group="people_list_tabs" text="#Citadel_Friends_WindowTitle" selected="true" />
+					<TabButton id="PlayersTab" class="FriendsOrPlayersButton" group="people_list_tabs" text="#Citadel_Players_WindowTitle" />
+				</Panel>
+			</Panel>
+			<Panel class="FriendsOrPlayersContents" hittest="false">
+				<TabContents id="FriendsTabContents" tabid="FriendsTab" group="people_list_tabs" hittest="false" selected="true">
+					<CitadelFriendsList id="FriendsList" />
+				</TabContents>
+				<TabContents id="PlayersTabContents" tabid="PlayersTab" group="people_list_tabs" hittest="false">
+					<CitadelPlayersList id="PlayersList" />
+				</TabContents>
+			</Panel>
+		</Panel>
+		<!--
+		  设置窗口壳:静态声明(可用全部 class 样式,含 hover/transition),
+		  打开/关闭 = LCTOpen 类;点击窗口外落到 EscapeBackground(见上)关闭并返回游戏。
+		-->
+		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true">
+			<Panel class="LCTHeader">
+				<Label class="LCTHeaderText" text="BABELTOWER 翻译" />
+				<Panel class="LCTHeaderSpacer" />
+				<Label id="LCTBuildId" class="LCTBuildId" text="" />
+				<Button id="LCTSettingsClose" class="LCTCloseBtn" onactivate="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); }">
+					<Label text="X" />
+				</Button>
+			</Panel>
+			<Panel id="LCTSettingsTabInstance" class="LCTTab">
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="启用翻译" />
+							<Label class="LCTRowHint" text="关闭后所有消息保留原文" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTTglEnabled" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('enabled'); }">
+								<Panel class="LCTToggleKnob" />
+							</Button>
+						</Panel>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="目标语言" />
+							<Label class="LCTRowHint" text="把别人的消息翻译成这个语言" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('targetLanguage'); }">
+								<Label id="LCTSelTargetLabel" class="LCTSelectLabel" text="简体中文" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuTarget" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','zh-Hans','简体中文'); }"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','zh-Hant','繁體中文'); }"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','en','English'); }"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','ja','日本語'); }"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','ko','한국어'); }"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','fr','Français'); }"><Label class="LCTMenuOptionLabel" text="Français (fr)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','de','Deutsch'); }"><Label class="LCTMenuOptionLabel" text="Deutsch (de)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','es','Español'); }"><Label class="LCTMenuOptionLabel" text="Español (es)" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="显示模式" />
+							<Label class="LCTRowHint" text="译文下方是否保留原文" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelDisplay" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('displayMode'); }">
+								<Label id="LCTSelDisplayLabel" class="LCTSelectLabel" text="双语" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuDisplay" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('displayMode','bilingual','双语'); }"><Label class="LCTMenuOptionLabel" text="双语 (原文 + 译文)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('displayMode','translation_only','仅译文'); }"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="发送前翻译" />
+							<Label class="LCTRowHint" text="把自己打的消息先翻成目标语言再发出" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelOutgoing" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoing'); }">
+								<Label id="LCTSelOutgoingLabel" class="LCTSelectLabel" text="关" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuOutgoing" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','off','关'); }"><Label class="LCTMenuOptionLabel" text="关 (发原文)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','translation','仅译文'); }"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','bilingual','双语'); }"><Label class="LCTMenuOptionLabel" text="双语 (原文 | 译文)" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="发送目标语言" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelOutTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoingTarget'); }">
+								<Label id="LCTSelOutTargetLabel" class="LCTSelectLabel" text="English" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuOutTarget" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','en','English'); }"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','zh-Hans','简体中文'); }"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','zh-Hant','繁體中文'); }"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','ja','日本語'); }"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','ko','한국어'); }"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="强制翻译" />
+							<Label class="LCTRowHint" text="跳过语言判断,一律翻译" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTTglForce" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('force'); }">
+								<Panel class="LCTToggleKnob" />
+							</Button>
+						</Panel>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="翻译自己的消息" />
+							<Label class="LCTRowHint" text="自己发出的消息也显示译文" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTTglTranslateOwn" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('translateOwn'); }">
+								<Panel class="LCTToggleKnob" />
+							</Button>
+						</Panel>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label class="LCTRowLabel" text="翻译超时" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelTimeout" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('timeoutMs'); }">
+								<Label id="LCTSelTimeoutLabel" class="LCTSelectLabel" text="8 秒" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuTimeout" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','4000','4 秒'); }"><Label class="LCTMenuOptionLabel" text="4 秒" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','8000','8 秒'); }"><Label class="LCTMenuOptionLabel" text="8 秒" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','12000','12 秒'); }"><Label class="LCTMenuOptionLabel" text="12 秒" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','16000','16 秒'); }"><Label class="LCTMenuOptionLabel" text="16 秒" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTFooter">
+					<Panel id="LCTDot" class="LCTDot" />
+					<Label id="LCTStatusText" class="LCTStatusText" text="未连接" />
+				</Panel>
+			</Panel>
+		</Panel>
+	</CitadelHudEscapeMenu>
+</root>

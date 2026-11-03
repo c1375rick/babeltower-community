@@ -2,8 +2,8 @@
 <!--
   BabelTower v3 — 大厅聊天布局覆盖
   结构取自原版 hudchat.xml 的反编译重建,保留原版 ID/class。
-  与 chat.xml 一样作为脚本加载载体:settings.vjs_c(设置宿主)+ lc_protocol.vjs_c(协议客户端);
-  两个 context 都会跑注入逻辑,通过全局面板树查重,只有一个会真正注入。
+  与 chat.xml 一样作为脚本加载载体:lc_protocol.vjs_c(协议客户端,双 context 属性选举,
+  只有 primary 驱动 CEF 面板)。设置 UI 已迁至 hud_escape_menu.xml shadow。
   内含隐藏协议面板 LCTNet(CitadelHTMLPanel,probe 实证形态,见 docs/PROTOCOL.md §2)。
 -->
 <root>
@@ -13,7 +13,6 @@
 		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
-		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
 		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
 	</scripts>
 	<CitadelHudChat defaultfocus="ChatInput" hittest="false">

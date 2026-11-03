@@ -2,40 +2,47 @@
 	"use strict";
 
 	/*
-	 * BabelTower v3 — 设置 Tab 自治 UI(由 lct_settings_tab.xml 引入,运行在 Escape Menu 的 JS context)
-	 * 与宿主(chat/hudchat context)不通 JS,通信通道 = 实例面板 LCTSettingsTabInstance 上的属性:
-	 *   lct_cfg      配置 JSON(双向:宿主写入初值,本 UI 修改后写回,宿主轮询采纳并持久化)
-	 *   lct_buildid  桥页面 buildId(宿主写)
-	 *   lct_status   桥状态文本(宿主写)
-	 *   lct_ui_alive 心跳(本 UI 写,宿主据此判断脚本存活;缺席 6 tick 宿主降级重建)
+	 * BabelTower v3 — 设置窗口控件逻辑(由 hud_escape_menu.xml 引入,运行于 Escape Menu context)
+	 *
+	 * 与协议(chat context 的 lc_protocol.js)不通 JS,唯一通道 = 共享面板(#Hud/root)属性:
+	 *   lct_cfg      配置 JSON(lc_protocol boot 发布默认值 → store 回载覆盖;本 UI 修改后写回,
+	 *                协议 cfgWatchTick 采纳并 store.put 落盘)
+	 *   lct_status   桥状态文本(协议 primary 写)
+	 *   lct_buildid  桥页面 buildId(协议 primary 写)
+	 *
+	 * 窗口壳/控件面板由 hud_escape_menu.xml 静态声明;XML 的 onactivate 通过 $.LCTUI* 调用
+	 * 本文件导出的函数(同时挂 $ 与 globalThis,QOLLOCK 同款 $.X 暴露形式)。
 	 *
 	 * 注意:本文件严禁定义名为 `$` 的局部函数/变量 —— 会遮蔽 Panorama 全局 `$` 对象,
 	 * 导致 $.Msg/$.Schedule/$.GetContextPanel 全部失效(审查发现的首发缺陷)。
 	 */
 
-	const CHANNEL_ID = "LCTSettingsTabInstance";
 	const ATTR_CFG = "lct_cfg";
-	const ATTR_BUILDID = "lct_buildid";
 	const ATTR_STATUS = "lct_status";
-	const ATTR_ALIVE = "lct_ui_alive";
+	const ATTR_BUILDID = "lct_buildid";
 
 	function log(msg) { try { $.Msg("[LCT][TabUI] " + msg); } catch (e) {} }
 
-	function exportGlobal(name, fn) {
+	// 同时挂到 $ 与 globalThis:XML 事件处理器以 $.X 形式调用(QOLLOCK 生产模式)
+	function exportFn(name, fn) {
+		try { $[name] = fn; } catch (e0) { log("export $" + name + " failed"); }
 		try {
 			if (typeof globalThis !== "undefined") { globalThis[name] = fn; return; }
-		} catch (e0) {}
+		} catch (e1) {}
 		try {
 			if (typeof window !== "undefined") { window[name] = fn; return; }
-		} catch (e1) {}
-		log("export " + name + " failed");
+		} catch (e2) {}
 	}
 
 	/* ---------- 面板定位 ---------- */
 
+	function ctxPanel() {
+		try { return $.GetContextPanel(); } catch (e) { return null; }
+	}
+
 	function globalRoot() {
 		try {
-			let p = $.GetContextPanel();
+			let p = ctxPanel();
 			let d = 0;
 			while (p && p.GetParent && p.GetParent() && d < 64) {
 				p = p.GetParent();
@@ -47,43 +54,35 @@
 		}
 	}
 
-	// 通道面板:从本 context 面板向上找实例 id;找不到(结构意外)再从全局根下找。
-	// 宿主与 Tab 双方都只认这个面板,属性读写不会错位。
-	function channel() {
+	// 共享面板:跨 context 属性通道的落点,与 lc_protocol.js 的 claimPanel() 同一选择
+	function sharedPanel() {
+		const root = globalRoot();
+		if (!root) return null;
 		try {
-			let p = $.GetContextPanel();
-			let d = 0;
-			while (p && d < 64) {
-				if (String(p.id || "") === CHANNEL_ID) return p;
-				if (!p.GetParent || !p.GetParent()) break;
-				p = p.GetParent();
-				d++;
-			}
-		} catch (e) {}
-		try {
-			const g = globalRoot();
-			if (g) return g.FindChildTraverse(CHANNEL_ID);
-		} catch (e2) {}
-		return null;
+			const hud = root.FindChildTraverse("Hud");
+			if (hud) return hud;
+		} catch (e0) {}
+		return root;
 	}
 
 	function findById(id) {
-		const c = channel();
+		const c = ctxPanel();
 		if (c) {
 			try { const f = c.FindChildTraverse(id); if (f) return f; } catch (e) {}
 		}
-		try { return $.GetContextPanel().FindChildTraverse(id); } catch (e2) { return null; }
+		try { const g = globalRoot(); if (g) return g.FindChildTraverse(id); } catch (e2) {}
+		return null;
 	}
 
-	/* ---------- 配置读写 ---------- */
+	/* ---------- 配置读写(共享面板属性) ---------- */
 
 	let cfg = null;
 
 	function readCfg() {
 		try {
-			const c = channel();
-			if (!c) return null;
-			const raw = c.GetAttributeString(ATTR_CFG, "");
+			const sp = sharedPanel();
+			if (!sp) return null;
+			const raw = sp.GetAttributeString(ATTR_CFG, "");
 			if (!raw) return null;
 			return JSON.parse(raw);
 		} catch (e) { return null; }
@@ -91,8 +90,8 @@
 
 	function writeCfg() {
 		try {
-			const c = channel();
-			if (c) c.SetAttributeString(ATTR_CFG, JSON.stringify(cfg));
+			const sp = sharedPanel();
+			if (sp) sp.SetAttributeString(ATTR_CFG, JSON.stringify(cfg));
 		} catch (e) { log("writeCfg failed: " + e); }
 	}
 
@@ -165,7 +164,7 @@
 		}
 	}
 
-	/* ---------- 交互入口(XML onactivate 调用) ---------- */
+	/* ---------- 交互入口(XML onactivate 以 $.LCTUI* 调用) ---------- */
 
 	function closeAllMenus() {
 		for (const skey in SELECTS) {
@@ -177,7 +176,7 @@
 		}
 	}
 
-	exportGlobal("LCTUIToggle", function (key) {
+	exportFn("LCTUIToggle", function (key) {
 		if (!cfg || !(key in TOGGLES)) { return; }
 		cfg[key] = !cfg[key];
 		const btn = findById(TOGGLES[key]);
@@ -187,7 +186,7 @@
 		writeCfg();
 	});
 
-	exportGlobal("LCTUIMenu", function (key) {
+	exportFn("LCTUIMenu", function (key) {
 		if (!cfg || !SELECTS[key]) { return; }
 		const menu = findById(SELECTS[key].menu);
 		const btn = findById(SELECTS[key].btn);
@@ -203,7 +202,7 @@
 		}
 	});
 
-	exportGlobal("LCTUIPick", function (key, val, label) {
+	exportFn("LCTUIPick", function (key, val, label) {
 		if (!cfg || !SELECTS[key]) { return; }
 		cfg[key] = (key === "timeoutMs") ? Number(val) : val;
 		const lbl = findById(SELECTS[key].label);
@@ -213,30 +212,25 @@
 		writeCfg();
 	});
 
-	/* ---------- 轮询宿主 ---------- */
+	exportFn("LCTUICloseAllMenus", closeAllMenus);
 
-	let polls = 0;
+	/* ---------- 轮询共享属性 ---------- */
 
 	function poll() {
-		polls += 1;
 		try {
-			const c = channel();
-			if (c) {
-				// 心跳:宿主 6 tick(约 6s)看不到它就判死重建,必须每次轮询都刷新
-				try { c.SetAttributeString(ATTR_ALIVE, String(polls)); } catch (e0) {}
-			}
 			const incoming = readCfg();
 			if (incoming && JSON.stringify(incoming) !== JSON.stringify(cfg)) {
 				cfg = incoming;
 				render();
 			}
-			if (c) {
+			const sp = sharedPanel();
+			if (sp) {
 				let bid = "";
-				try { bid = c.GetAttributeString(ATTR_BUILDID, ""); } catch (e1) {}
+				try { bid = sp.GetAttributeString(ATTR_BUILDID, ""); } catch (e1) {}
 				const bidLbl = findById("LCTBuildId");
 				if (bidLbl && bidLbl.text !== bid) { bidLbl.text = bid; }
 				let st = "";
-				try { st = c.GetAttributeString(ATTR_STATUS, ""); } catch (e2) {}
+				try { st = sp.GetAttributeString(ATTR_STATUS, ""); } catch (e2) {}
 				const stLbl = findById("LCTStatusText");
 				const dot = findById("LCTDot");
 				if (stLbl && st !== "" && st !== stLbl.text) {
@@ -250,13 +244,13 @@
 				}
 			}
 		} finally {
-			// 续命放在 finally:循环体任何未预料的异常都不能杀死心跳
+			// 续命放在 finally:循环体任何未预料的异常都不能杀死轮询
 			try { $.Schedule(0.25, poll); } catch (e3) {}
 		}
 	}
 
 	function boot() {
-		log("Tab UI boot");
+		log("settings UI boot");
 		const got = readCfg();
 		if (got) { cfg = got; render(); }
 		poll();

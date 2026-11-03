@@ -2,7 +2,8 @@
 <!--
   BabelTower v3 — 游戏内聊天布局覆盖
   结构取自 Valve chat.xml 的反编译重建,保留原版 ID/class。
-  本文件是脚本的加载载体:settings.vjs_c(设置宿主)+ lc_protocol.vjs_c(协议客户端)。
+  本文件是脚本加载载体:lc_protocol.vjs_c(协议客户端,配置所有权 + 状态/配置共享属性发布)。
+  设置 UI 已迁至 hud_escape_menu.xml shadow(QOLLOCK 生产模式,零跨 context 注入)。
   内含隐藏协议面板 LCTNet(CitadelHTMLPanel,probe 实证形态,见 docs/PROTOCOL.md §2)。
 -->
 <root>
@@ -12,7 +13,6 @@
 		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
-		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
 		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
 	</scripts>
 	<snippets>

@@ -1,11 +1,31 @@
-/* BabelTower v3 — 设置面板样式(注入 Escape Menu 使用)
+/* BabelTower v3 — 设置窗口样式(Escape Menu shadow 专属)
+   样式由 hud_escape_menu.xml 的 <styles> include 激活 —— 与 UI 同 context 才生效
+   (QOLLOCK 生产实证:跨 context 样式从不依赖,样式必须跟面板同 layout)。
    审查修订:控件等高 48×24、箭头钉右缘、滑块过渡、菜单限高、展开态反馈、
    选中项底色、提示对比度、灰阶三档收敛 */
+
+/* ---- 窗口壳(静态声明于 hud_escape_menu.xml,打开/关闭 = .LCTOpen) ---- */
+.LCTSettingsWindow {
+	width: 640px;
+	height: 700px;
+	horizontal-align: center;
+	vertical-align: center;
+	background-color: rgba(13, 18, 28, 0.98);
+	border: 1px solid rgba(110, 168, 255, 0.35);
+	border-radius: 8px;
+	box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.6);
+	padding: 14px 18px 12px 18px;
+	visibility: collapse;
+	overflow: squish scroll;
+}
+.LCTSettingsWindow.LCTOpen {
+	visibility: visible;
+}
 
 .LCTTab {
 	width: 100%;
 	flow-children: down;
-	padding: 14px 18px 10px 18px;
+	padding: 2px 0px 0px 0px;
 }
 
 /* ---- 头部 ---- */
@@ -23,10 +43,32 @@
 	letter-spacing: 2px;
 	vertical-align: center;
 }
+.LCTHeaderSpacer {
+	width: fill;
+	height: 1px;
+}
 .LCTBuildId {
 	color: #8a94a6;
 	font-size: 11px;
+	vertical-align: center;
+}
+.LCTCloseBtn {
+	width: 28px;
+	height: 28px;
 	horizontal-align: right;
+	vertical-align: center;
+	background-color: rgba(255, 255, 255, 0.08);
+	border-radius: 4px;
+	margin-left: 10px;
+	flow-children: down;
+}
+.LCTCloseBtn:hover {
+	background-color: rgba(255, 255, 255, 0.18);
+}
+.LCTCloseBtn Label {
+	color: #c8d2e0;
+	font-size: 13px;
+	horizontal-align: center;
 	vertical-align: center;
 }
 
