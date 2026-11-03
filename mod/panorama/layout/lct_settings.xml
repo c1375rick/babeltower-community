@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BabelTower v3 — snippet 定义(lct_ 前缀避免遮蔽游戏同名文件)
+  注意:这里不放 <scripts>。lct_settings.vjs_c 由 chat.xml / hudchat.xml 直接 include,
+  同一 context 重复 include 会导致脚本双重执行。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/lct_settings.vcss_c" />
+	</styles>
+	<snippet name="LCTSettingsTab">
+		<Panel class="LCTSettingsTab" tabindex="auto" hittest="true">
+			<Label class="LCTSectionTitle" text="BabelTower v3 — Settings Tab Injected OK" />
+			<Label class="LCTHint" text="If you see this, Escape Menu injection works. Convar persistence next." />
+		</Panel>
+	</snippet>
+</root>

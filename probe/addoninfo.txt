@@ -1,0 +1,8 @@
+{
+	"addon_title"	"LCT CEF Probe"
+	"addon_version"	"1.0.0"
+	"addon_tagline"	"Minimal CEF transport probe (no bridge, no translation)"
+	"addon_author"	"BabelTower"
+	"addon_description"	"Measures remote https load, repeated SetURL, and document.title return channel."
+	"addon_content"	"panorama"
+}

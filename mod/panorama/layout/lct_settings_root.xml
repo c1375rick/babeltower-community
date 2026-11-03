@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BabelTower v3 — 隐藏根面板(lct_ 前缀避免遮蔽游戏同名文件)
+  预留:目前脚本由 chat.xml / hudchat.xml 作为载体加载,本文件未被引用,仅备用。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/lct_settings.vcss_c" />
+	</styles>
+	<scripts>
+		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
+	</scripts>
+	<Panel class="LCTSettingsRoot" hittest="false" />
+</root>

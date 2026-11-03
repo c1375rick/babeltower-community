@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BabelTower v3 — 游戏内聊天布局覆盖
+  结构取自 Valve chat.xml 的反编译重建,保留原版 ID/class。
+  本文件是脚本在游戏内的加载载体(游戏按路径加载 chat.xml,随之执行 settings.vjs_c)。
+  移除了 probe 时代的 CEF 面板/状态标签/自定义提交处理器。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/citadel_base_styles.vcss_c" />
+		<include src="s2r://panorama/styles/chat.vcss_c" />
+	</styles>
+	<scripts>
+		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
+	</scripts>
+	<snippets>
+		<snippet name="ChatMessageSource">
+			<Panel>
+				<Label class="ChannelName" text="[{s:channel_name}]" />
+				<Label class="SenderName" text="{s:sender_name}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Text">
+			<Panel class="Text">
+				<Label text="{s:message_text}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Ping">
+			<Panel class="Ping">
+				<Image id="TargetHeroImage" />
+				<Label id="PingLabel" text="{s:ping_text}" html="true" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_HeroImage">
+			<Panel class="SenderHeroImage">
+				<CitadelHeroImage id="HeroImage" heroimagestyle="small" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_AvatarImage">
+			<Panel class="SenderAvatarImage">
+				<CitadelAvatarImage id="AvatarImage" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_LocalClient">
+			<Panel class="SenderLocalClient" />
+		</snippet>
+		<snippet name="ChatMessage">
+			<Panel class="ChatMessage Expired">
+				<Panel id="SenderImage" />
+				<Panel class="MessageBody">
+					<Panel id="MessageSource" />
+					<Panel id="MessageContents" />
+				</Panel>
+			</Panel>
+		</snippet>
+	</snippets>
+	<CitadelChat defaultfocus="ChatInput" hittest="false">
+		<Panel id="ChatLinesArea" hittest="false">
+			<Panel class="ChatLinesWrapper" hittest="false">
+				<Panel id="ChatMessages" hittest="false" />
+			</Panel>
+		</Panel>
+		<Label class="ChatDisabledLabel" text="#Citadel_Hud_ChatDisabled" hittest="false" />
+		<Panel id="ChatControls">
+			<Label id="ChatTargetLabel" text="#citadel_chat_placeholder" />
+			<TextEntry id="ChatInput" onblur="CitadelChatInputBlur();" placeholder="" maxchars="1024" />
+		</Panel>
+	</CitadelChat>
+</root>

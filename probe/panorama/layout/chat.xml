@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LCT CEF PROBE — 最小验证布局
+  结构取自 Valve chat.xml 的反编译重建,保留原版 ID/class,仅替换脚本与样式引用,
+  并加入一个隐藏 CitadelHTMLPanel + 一个状态 Label。
+  不包含任何翻译逻辑。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/citadel_base_styles.vcss_c" />
+		<include src="s2r://panorama/styles/chat.vcss_c" />
+		<include src="s2r://panorama/styles/probe.vcss_c" />
+	</styles>
+	<scripts>
+		<include src="s2r://panorama/scripts/probe.vjs_c" />
+	</scripts>
+	<snippets>
+		<snippet name="ChatMessageSource">
+			<Panel>
+				<Label class="ChannelName" text="[{s:channel_name}]" />
+				<Label class="SenderName" text="{s:sender_name}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Text">
+			<Panel class="Text">
+				<Label text="{s:message_text}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Ping">
+			<Panel class="Ping">
+				<Image id="TargetHeroImage" />
+				<Label id="PingLabel" text="{s:ping_text}" html="true" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_HeroImage">
+			<Panel class="SenderHeroImage">
+				<CitadelHeroImage id="HeroImage" heroimagestyle="small" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_AvatarImage">
+			<Panel class="SenderAvatarImage">
+				<CitadelAvatarImage id="AvatarImage" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_LocalClient">
+			<Panel class="SenderLocalClient" />
+		</snippet>
+		<snippet name="ChatMessage">
+			<Panel class="ChatMessage Expired">
+				<Panel id="SenderImage" />
+				<Panel class="MessageBody">
+					<Panel id="MessageSource" />
+					<Panel id="MessageContents" />
+				</Panel>
+			</Panel>
+		</snippet>
+	</snippets>
+	<CitadelChat defaultfocus="ChatInput" hittest="false">
+		<Panel id="ChatLinesArea" hittest="false">
+			<Panel class="ChatLinesWrapper" hittest="false">
+				<Panel id="ChatMessages" hittest="false" />
+			</Panel>
+		</Panel>
+		<Label class="ChatDisabledLabel" text="#Citadel_Hud_ChatDisabled" hittest="false" />
+		<Panel id="ChatControls">
+			<Label id="ChatTargetLabel" text="#citadel_chat_placeholder" />
+			<TextEntry id="ChatInput" oninputsubmit="LCTOnChatSubmit();" onblur="CitadelChatInputBlur();" placeholder="" maxchars="1024" />
+		</Panel>
+		<!-- 隐藏的 CEF 面板:所有导航都发到这里 -->
+		<CitadelHTMLPanel id="LCTProbe" class="LCTProbe" hittest="false" acceptsfocus="false" />
+		<!-- 探针结果(打开聊天框可见) -->
+		<Panel id="LCTProbeBox" class="LCTProbeBox" hittest="false">
+			<Label id="LCTProbeText" class="LCTProbeText" text="probe booting..." />
+		</Panel>
+	</CitadelChat>
+</root>

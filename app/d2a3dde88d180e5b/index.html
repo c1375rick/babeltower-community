@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://edge.microsoft.com https://api.cognitive.microsofttranslator.com https://api.mymemory.translated.net; base-uri 'none'">
+<title>bt</title>
+</head>
+<body>
+<script>
+(function () {
+	"use strict";
+
+	/*
+	 * BabelTower Community v3 - bridge page
+	 * Spec: docs/PROTOCOL.md (repo root).
+	 * Uplink:   location.hash  "#q=" + encodeURIComponent(JSON.stringify(request))
+	 * Downlink: document.title  LCT3A / LCT3R / LCT3C / LCT3E frames (game-side listener).
+	 * Rules: hashchange-only (never the initial fragment); no console; localStorage
+	 *        only via store.get/put with "lct:" prefix; requests only to the CSP allowlist.
+	 */
+
+	var BUILD_ID = "3a7f19c2e5d84b06";
+	var PROTO = 3;
+	var MAX_REQ = 32768;      // uplink payload cap (spec 11.2)
+	var MAX_VAL = 16384;      // store value cap (spec 6)
+	var CHUNK = 1100;         // per-chunk JSON payload budget (spec 4.1: title budget ~1500, head reserved)
+	var MAX_CHUNKS = 6;       // spec 4.2
+	var PAD = new Array(1501).join("x"); // 1500 x, spec 4.1
+	var UPSTREAM_BUDGET = 3500;
+	var TOTAL_BUDGET = 7000;
+	var PENDING_TTL = 60000;
+
+	var seq = 0;
+	var cache = {};           // translation cache, document-lifetime
+	var pending = {};         // id -> {n, chunks, at}
+	var edgeToken = null;
+	var edgeTokenAt = 0;
+	var reqAt = 0;
+
+	function nextSeq() { seq += 1; return seq; }
+
+	function sendA() {
+		document.title = "LCT3A:" + BUILD_ID + ":" + nextSeq() + ":" + PAD;
+	}
+
+	function sendR(id, obj) {
+		document.title = "LCT3R:" + id + ":" + nextSeq() + ":" + JSON.stringify(obj);
+	}
+
+	function sendChunk(id, i, n, text) {
+		document.title = "LCT3C:" + id + ":" + i + "/" + n + ":" + nextSeq() + ":" + text;
+	}
+
+	var RETRYABLE = { PROVIDER_DOWN: true, TIMEOUT: true };
+	function sendErr(id, code, detail) {
+		if (!id) { return; }
+		document.title = "LCT3E:" + id + ":" + nextSeq() + ":" +
+			JSON.stringify({ ok: false, code: code, detail: String(detail || "").slice(0, 120), retryable: !!RETRYABLE[code] });
+	}
+
+	function validId(id) {
+		return typeof id === "string" && id.length >= 1 && id.length <= 64;
+	}
+
+	/* ---------- request parsing ---------- */
+
+	function parseReq() {
+		var h = location.hash || "";
+		if (h.charAt(0) === "#") { h = h.slice(1); }
+		if (h.indexOf("q=") !== 0) { return null; }
+		var raw = h.slice(2);
+		if (raw.length > MAX_REQ) { return { err: "BAD_REQUEST", detail: "size" }; }
+		var o = null;
+		try { o = JSON.parse(decodeURIComponent(raw)); } catch (e) { return { err: "BAD_REQUEST", detail: "json" }; }
+		if (!o || typeof o !== "object") { return { err: "BAD_REQUEST", detail: "shape" }; }
+		if (!validId(o.id)) { return { err: null }; } // unaddressable: drop silently
+		if (o.v !== PROTO) { return { err: "PROTO_MISMATCH", detail: "v", id: o.id }; }
+		if (typeof o.op !== "string") { return { err: "BAD_REQUEST", detail: "op", id: o.id }; }
+		return { req: o };
+	}
+
+	/* ---------- fetch helper with timeout ---------- */
+
+	function fetchX(method, url, body, headers, timeout, cb) {
+		var done = false;
+		var ctrl = null;
+		try { ctrl = new AbortController(); } catch (e) { ctrl = null; }
+		var t = setTimeout(function () {
+			if (done) { return; }
+			done = true;
+			if (ctrl) { try { ctrl.abort(); } catch (e2) {} }
+			cb("timeout");
+		}, timeout);
+		var opts = { method: method, headers: headers || {} };
+		if (ctrl) { opts.signal = ctrl.signal; }
+		if (body) { opts.body = body; }
+		fetch(url, opts).then(function (res) {
+			return res.text().then(function (txt) { return { status: res.status, text: txt }; });
+		}).then(function (r2) {
+			if (done) { return; }
+			done = true;
+			clearTimeout(t);
+			if (r2.status < 200 || r2.status >= 300) { cb("http " + r2.status); }
+			else { cb(null, r2.text); }
+		})["catch"](function () {
+			if (done) { return; }
+			done = true;
+			clearTimeout(t);
+			cb("net");
+		});
+	}
+
+	function remaining(deadline) { return deadline - Date.now(); }
+
+	/* ---------- providers ---------- */
+
+	var MM_LANG = { "zh-Hans": "zh-CN", "zh-Hant": "zh-TW", "en": "en", "ja": "ja", "ko": "ko", "fr": "fr", "de": "de", "es": "es" };
+
+	function getToken(deadline, cb) {
+		var now = Date.now();
+		if (edgeToken && (now - edgeTokenAt) < 8 * 60 * 1000) { cb(null, edgeToken); return; }
+		var t = Math.min(remaining(deadline), 3000);
+		if (t <= 0) { cb("budget"); return; }
+		fetchX("GET", "https://edge.microsoft.com/translate/auth", null, null, t, function (err, txt) {
+			if (err) { cb(err); return; }
+			var tok = String(txt).replace(/^\s+|\s+$/g, "");
+			if (!tok) { cb("empty-token"); return; }
+			edgeToken = tok;
+			edgeTokenAt = now;
+			cb(null, tok);
+		});
+	}
+
+	function trEdge(d, deadline, cb) {
+		if (!d.target) { cb("BAD_REQUEST"); return; }
+		getToken(deadline, function (err, tok) {
+			if (err) { cb(err); return; }
+			var url = "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=" + encodeURIComponent(d.target);
+			if (d.source && d.source !== "auto") { url += "&from=" + encodeURIComponent(d.source); }
+			var body = JSON.stringify((d.items || []).map(function (it) { return { Text: String(it.t) }; }));
+			var t = remaining(deadline);
+			if (t <= 0) { cb("budget"); return; }
+			fetchX("POST", url, body, { "Authorization": "Bearer " + tok, "Content-Type": "application/json" }, t, function (err2, txt) {
+				if (err2) { cb(err2); return; }
+				try {
+					var arr = JSON.parse(txt);
+					var out = [];
+					for (var i = 0; i < arr.length; i++) {
+						var tr = arr[i] && arr[i].translations && arr[i].translations[0];
+						out.push({ i: (d.items[i] ? d.items[i].i : i), t: tr ? String(tr.text) : "" });
+					}
+					cb(null, out);
+				} catch (e) { cb("parse"); }
+			});
+		});
+	}
+
+	function trMm(d, deadline, cb) {
+		if (!d.target) { cb("BAD_REQUEST"); return; }
+		var src = (d.source && d.source !== "auto") ? d.source : "en";
+		var to = MM_LANG[d.target] || d.target;
+		var out = [];
+		var idx = 0;
+		function one() {
+			if (idx >= (d.items || []).length) { cb(null, out); return; }
+			if (remaining(deadline) <= 300) { cb("budget"); return; }
+			var it = d.items[idx];
+			var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(it.t) + "&langpair=" + encodeURIComponent(src + "|" + to);
+			var t = Math.min(remaining(deadline), 3000);
+			fetchX("GET", url, null, null, t, function (err, txt) {
+				if (err) { cb(err); return; }
+				try {
+					var j = JSON.parse(txt);
+					var tr = j && j.responseData && j.responseData.translatedText;
+					out.push({ i: it.i, t: tr ? String(tr) : "" });
+					idx += 1;
+					one();
+				} catch (e) { cb("parse"); }
+			});
+		}
+		one();
+	}
+
+	var PROVIDERS = { "edge": trEdge, "mymemory": trMm };
+
+	/* ---------- chunking ---------- */
+
+	function splitChunks(text, size) {
+		var out = [];
+		var i = 0;
+		while (i < text.length) {
+			var end = Math.min(i + size, text.length);
+			if (end < text.length) {
+				var c = text.charCodeAt(end - 1);
+				if (c >= 0xD800 && c <= 0xDBFF) { end -= 1; } // never split a UTF-16 surrogate pair
+				if (end <= i) { end = i + 1; }
+			}
+			out.push(text.slice(i, end));
+			i = end;
+		}
+		return out;
+	}
+
+	function sweepPending() {
+		var now = Date.now();
+		for (var id in pending) {
+			if (pending.hasOwnProperty(id) && (now - pending[id].at) > PENDING_TTL) { delete pending[id]; }
+		}
+	}
+
+	function sendResult(id, obj) {
+		var json = JSON.stringify(obj);
+		var head = "LCT3R:" + id + ":" + nextSeq() + ":";
+		if (json.length <= CHUNK - head.length) {
+			document.title = head + json;
+			return;
+		}
+		var chunks = splitChunks(json, CHUNK);
+		if (chunks.length > MAX_CHUNKS) { sendErr(id, "TOO_LONG", json.length); return; }
+		pending[id] = { chunks: chunks, n: chunks.length, at: Date.now() };
+		// spec 4.2: receiver-pull. Write chunk 0 now; chunks 1..n-1 wait for next(id,i).
+		sendChunk(id, 0, chunks.length, chunks[0]);
+	}
+
+	function onNext(r) {
+		sweepPending();
+		var p = pending[r.id];
+		if (!p) { return; }
+		if (typeof r.i !== "number" || r.i < 1 || r.i >= p.n) { return; }
+		sendChunk(r.id, r.i, p.n, p.chunks[r.i]);
+		if (r.i === p.n - 1) { delete pending[r.id]; }
+	}
+
+	/* ---------- ops ---------- */
+
+	function onHello() { sendA(); }
+
+	function onPing() {
+		sendR(curId, { ok: true, ms: Date.now() - reqAt });
+	}
+
+	function onTr(r) {
+		var d = r.d;
+		if (!d || !d.items || !d.items.length || d.items.length > 8) { sendErr(r.id, "BAD_REQUEST", "items"); return; }
+		var total = 0;
+		for (var i = 0; i < d.items.length; i++) { total += String(d.items[i].t || "").length; }
+		if (total > 2100) { sendErr(r.id, "TOO_LONG", total); return; }
+		var ck = (d.target || "") + "|" + (d.source || "auto") + "|";
+		for (var j = 0; j < d.items.length; j++) { ck += String(d.items[j].t) + "\u0001"; }
+		if (cache[ck]) { sendR(r.id, cache[ck]); return; }
+
+		var cfg = r.cfg || {};
+		var order = (cfg.order && cfg.order.length) ? cfg.order : ["edge", "mymemory"];
+		var started = Date.now();
+		var deadline = started + TOTAL_BUDGET;
+		var idx = 0;
+
+		function tryNext() {
+			if (idx >= order.length) { sendErr(r.id, "PROVIDER_DOWN", "all upstreams"); return; }
+			var name = order[idx];
+			idx += 1;
+			var fn = PROVIDERS[name];
+			if (!fn) { tryNext(); return; }
+			fn(d, deadline, function (err, items) {
+				if (err) { tryNext(); return; }
+				var resp = { ok: true, items: items, provider: name, cached: false };
+				cache[ck] = resp;
+				sendResult(r.id, resp);
+			});
+		}
+		tryNext();
+	}
+
+	function onStoreGet(r) {
+		var ls = null;
+		try { ls = window.localStorage; ls.getItem("lct:__probe"); } catch (e) { sendErr(r.id, "STORE_UNAVAILABLE", ""); return; }
+		if (!/^[A-Za-z0-9_.-]{1,64}$/.test(String(r.k || ""))) { sendErr(r.id, "BAD_REQUEST", "k"); return; }
+		var raw = null;
+		try { raw = ls.getItem("lct:" + r.k); } catch (e2) { sendErr(r.id, "STORE_UNAVAILABLE", ""); return; }
+		var val = null;
+		if (raw !== null) { try { val = JSON.parse(raw); } catch (e3) { val = null; } }
+		sendR(r.id, { ok: true, val: val });
+	}
+
+	function onStorePut(r) {
+		var ls = null;
+		try { ls = window.localStorage; ls.setItem("lct:__probe", "1"); ls.removeItem("lct:__probe"); } catch (e) { sendErr(r.id, "STORE_UNAVAILABLE", ""); return; }
+		if (!/^[A-Za-z0-9_.-]{1,64}$/.test(String(r.k || ""))) { sendErr(r.id, "BAD_REQUEST", "k"); return; }
+		var raw = null;
+		try { raw = JSON.stringify(r.val); } catch (e2) { sendErr(r.id, "BAD_REQUEST", "val"); return; }
+		if (raw.length > MAX_VAL) { sendErr(r.id, "BAD_REQUEST", "size"); return; }
+		try { ls.setItem("lct:" + r.k, raw); } catch (e3) { sendErr(r.id, "STORE_UNAVAILABLE", ""); return; }
+		sendR(r.id, { ok: true });
+	}
+
+	/* ---------- dispatch ---------- */
+
+	var curId = null;
+
+	function dispatch(r) {
+		curId = r.id;
+		if (r.op === "hello") { onHello(); return; }
+		if (r.op === "ping") { onPing(); return; }
+		if (r.op === "tr") { onTr(r); return; }
+		if (r.op === "next") { onNext(r); return; }
+		if (r.op === "store.get") { onStoreGet(r); return; }
+		if (r.op === "store.put") { onStorePut(r); return; }
+		sendErr(r.id, "BAD_REQUEST", "op");
+	}
+
+	window.addEventListener("hashchange", function () {
+		reqAt = Date.now();
+		var p = parseReq();
+		if (!p) { return; }
+		if (p.err) { sendErr(p.id, p.err, p.detail); return; }
+		dispatch(p.req);
+	});
+})();
+</script>
+</body>
+</html>

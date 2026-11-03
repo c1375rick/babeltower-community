@@ -1,0 +1,19 @@
+.LCTProbe {
+	width: 4px;
+	height: 4px;
+	opacity: 0.01;
+}
+
+.LCTProbeBox {
+	flow-children: down;
+	width: 100%;
+	padding: 6px 10px;
+	background-color: #000000cc;
+	border-top: 1px solid #ffffff22;
+}
+
+.LCTProbeText {
+	color: #e8ecf4;
+	font-size: 15px;
+	white-space: normal;
+}

@@ -1,0 +1,8 @@
+{
+	"addon_title"	"BabelTower Community v3"
+	"addon_version"	"1.0.0"
+	"addon_tagline"	"Deadlock chat translation (bridgeless)"
+	"addon_author"	"BabelTower"
+	"addon_description"	"Minimal skeleton: convar persistence + Escape Menu tab injection test"
+	"addon_content"	"panorama"
+}
