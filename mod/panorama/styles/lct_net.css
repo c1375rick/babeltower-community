@@ -1,0 +1,8 @@
+/* BabelTower v3 — 协议面板(隐藏 CEF,见 docs/PROTOCOL.md §2)
+   必须 visibility:visible(仅 opacity 不够:CEF 会暂停不可见面板的定时器) */
+.LCTNet {
+	width: 4px;
+	height: 4px;
+	visibility: visible;
+	opacity: 0.01;
+}

@@ -1,20 +1,191 @@
-.LCTSettingsRoot {
-	visibility: collapse;
-	width: 0;
-	height: 0;
-}
-.LCTSettingsTab {
-	flow-children: down;
-	padding: 16px;
+/* BabelTower v3 — 设置面板样式(注入 Escape Menu 使用)
+   审查修订:控件等高 48×24、箭头钉右缘、滑块过渡、菜单限高、展开态反馈、
+   选中项底色、提示对比度、灰阶三档收敛 */
+
+.LCTTab {
 	width: 100%;
+	flow-children: down;
+	padding: 14px 18px 10px 18px;
 }
-.LCTSectionTitle {
+
+/* ---- 头部 ---- */
+.LCTHeader {
+	flow-children: right;
+	width: 100%;
+	padding-bottom: 8px;
+	margin-bottom: 4px;
+	border-bottom: 1px solid rgba(110, 168, 255, 0.28);
+}
+.LCTHeaderText {
 	color: #6ea8ff;
-	font-size: 16px;
-	font-weight: 600;
-	margin-bottom: 8px;
+	font-size: 15px;
+	font-weight: bold;
+	letter-spacing: 2px;
+	vertical-align: center;
 }
-.LCTHint {
-	color: #9aa3b2;
+.LCTBuildId {
+	color: #8a94a6;
+	font-size: 11px;
+	horizontal-align: right;
+	vertical-align: center;
+}
+
+/* ---- 行 ---- */
+.LCTRow {
+	width: 100%;
+	padding: 8px 6px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	flow-children: down;
+}
+.LCTRow:hover {
+	background-color: rgba(110, 168, 255, 0.06);
+}
+.LCTLine {
+	width: 100%;
+	flow-children: right;
+}
+.LCTRowBody {
+	width: fill;
+	flow-children: down;
+	vertical-align: center;
+}
+.LCTRowLabel {
+	color: #c8d2e0;
+	font-size: 14px;
+}
+.LCTRowHint {
+	color: #6f7a90;
+	font-size: 12px;
+	margin-top: 2px;
+}
+.LCTRight {
+	flow-children: right;
+	horizontal-align: right;
+	vertical-align: center;
+}
+
+/* ---- 开关(与下拉等高 28:胶囊 24 + 视觉居中) ---- */
+.LCTToggle {
+	width: 48px;
+	height: 24px;
+	border-radius: 12px;
+	background-color: rgba(255, 255, 255, 0.14);
+	flow-children: right;
+	transition: background-color 0.15s;
+}
+.LCTToggle:hover {
+	background-color: rgba(255, 255, 255, 0.22);
+}
+.LCTToggle.On {
+	background-color: #3d6db8;
+}
+.LCTToggle.On:hover {
+	background-color: #4a7dcd;
+}
+.LCTToggleKnob {
+	width: 18px;
+	height: 18px;
+	border-radius: 9px;
+	background-color: #e8edf5;
+	margin: 3px;
+	box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.4);
+	transition: margin-left 0.15s ease-in-out;
+}
+.LCTToggle.On .LCTToggleKnob {
+	margin-left: 27px;
+}
+
+/* ---- 下拉选择 ---- */
+.LCTSelect {
+	min-width: 150px;
+	height: 28px;
+	background-color: rgba(255, 255, 255, 0.08);
+	border-radius: 4px;
+	padding: 0px 10px;
+	flow-children: right;
+	transition: background-color 0.12s;
+}
+.LCTSelect:hover {
+	background-color: rgba(255, 255, 255, 0.15);
+}
+.LCTSelect.Open {
+	background-color: rgba(110, 168, 255, 0.14);
+}
+.LCTSelectLabel {
+	width: fill;
+	color: #e8edf5;
 	font-size: 13px;
+	vertical-align: center;
+}
+.LCTSelectArrow {
+	color: #6ea8ff;
+	font-size: 11px;
+	margin-left: 8px;
+	vertical-align: center;
+	transition: transform 0.15s;
+}
+.LCTSelect.Open .LCTSelectArrow {
+	transform: rotateX(180deg);
+}
+.LCTMenu {
+	width: 100%;
+	flow-children: down;
+	margin-top: 4px;
+	background-color: rgba(16, 22, 34, 0.96);
+	border: 1px solid rgba(110, 168, 255, 0.3);
+	border-radius: 6px;
+	padding: 4px;
+	max-height: 240px;
+	overflow: squish scroll;
+	visibility: collapse;
+}
+.LCTMenu.Open {
+	visibility: visible;
+}
+.LCTMenuOption {
+	width: 100%;
+	padding: 6px 10px;
+	border-radius: 4px;
+	flow-children: right;
+}
+.LCTMenuOption:hover {
+	background-color: rgba(110, 168, 255, 0.15);
+}
+.LCTMenuOptionLabel {
+	color: #c8d2e0;
+	font-size: 13px;
+}
+.LCTMenuOption.Sel {
+	background-color: rgba(110, 168, 255, 0.12);
+}
+.LCTMenuOption.Sel .LCTMenuOptionLabel {
+	color: #6ea8ff;
+	font-weight: bold;
+}
+
+/* ---- 底部状态 ---- */
+.LCTFooter {
+	width: 100%;
+	flow-children: right;
+	padding-top: 10px;
+	margin-top: 2px;
+}
+.LCTDot {
+	width: 8px;
+	height: 8px;
+	border-radius: 4px;
+	background-color: #8a94a6;
+	vertical-align: center;
+}
+.LCTDot.Ok {
+	background-color: #58c07a;
+}
+.LCTDot.Bad {
+	background-color: #d05a5a;
+}
+.LCTStatusText {
+	color: #8a94a6;
+	font-size: 12px;
+	margin-left: 8px;
+	vertical-align: center;
 }
