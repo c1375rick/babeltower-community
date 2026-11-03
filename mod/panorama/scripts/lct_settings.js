@@ -77,6 +77,11 @@
 	let _instTicks = 0;      // 当前实例存在以来的 tick 数(心跳监督)
 	let _lastTabRaw = "";    // 上次从 Tab 读到的 lct_cfg 原文
 	let _lastHudRaw = "";    // 上次从 #Hud 读到的 lct_cfg 原文(跨 context 会话收敛)
+	let _lastPanel = null;   // 上次看到的实例面板(变更即重新辨认 layout/兜底,防互删乒乓)
+	let _lastContainerId = "none"; // 最近一次容器查找结果(信标显示)
+	let _uiAliveSeen = "";   // 最近一次读到的心跳值(信标显示)
+	let _beacon = null;      // 诊断信标:与设置容器查找完全独立,始终可见(临时,稳定后移除)
+	let _beaconText = null;
 	let _tab = null;         // 当前实例面板引用(兜底 UI 回调用)
 	const _fb = {};          // 兜底 UI 控件引用 { key: {kind, btn, text} }
 	let _fbStatus = null;
@@ -245,6 +250,87 @@
 		return best;
 	}
 
+	/* ---------- 诊断信标(临时) ----------
+	 * con_logfile 已实证抓不到 PanoramaScript 行,诊断只能靠画面自报。
+	 * 信标挂在 #Hud(兜底全局根),与设置容器查找解耦:
+	 *   信标都不出现  = 遮蔽 layout 没加载(宿主脚本根本没跑)
+	 *   c=none        = 设置容器没找到(游戏更新改了结构?)
+	 *   m=layout      = BLoadLayout 路径成功
+	 *   m=fallback    = layout 失败/Tab 脚本无心跳,已降级 JS 兜底
+	 *   br=primary/READY@3a7f19c2 = 协议客户端选举与握手状态
+	 */
+
+	function ensureBeacon(root) {
+		if (_beacon) {
+			let ok = true;
+			try { ok = _beacon.IsValid(); } catch (e) { ok = false; }
+			if (ok) return true;
+			_beacon = null;
+			_beaconText = null;
+		}
+		// 跨 context 去重:另一 context 已建则直接采用
+		try {
+			const exist = root.FindChildTraverse("LCTBeacon");
+			if (exist) {
+				const t = exist.FindChildTraverse("LCTBeaconText");
+				if (t) {
+					_beacon = exist;
+					_beaconText = t;
+					return true;
+				}
+			}
+		} catch (eX) {}
+		const anchors = [];
+		try {
+			const hud = root.FindChildTraverse("Hud");
+			if (hud) anchors.push(hud);
+		} catch (e) {}
+		anchors.push(root);
+		for (let i = 0; i < anchors.length; i++) {
+			try {
+				const b = $.CreatePanel("Panel", anchors[i], "LCTBeacon");
+				if (!b) continue;
+				safeStyle(b, "horizontalAlign", "left");
+				safeStyle(b, "verticalAlign", "bottom");
+				safeStyle(b, "margin", "12px");
+				safeStyle(b, "backgroundColor", "rgba(8, 12, 20, 0.75)");
+				safeStyle(b, "borderRadius", "4px");
+				safeStyle(b, "padding", "4px 8px");
+				try { b.hittest = false; } catch (e0) {}
+				try { b.acceptsfocus = false; } catch (e1) {}
+				const t = $.CreatePanel("Label", b, "LCTBeaconText");
+				safeStyle(t, "color", "#9fe0a8");
+				safeStyle(t, "fontSize", "11px");
+				try { t.hittest = false; } catch (e2) {}
+				_beacon = b;
+				_beaconText = t;
+				return true;
+			} catch (e3) { continue; }
+		}
+		return false;
+	}
+
+	function bridgeSnapshot() {
+		try {
+			const b = globalThis.LCTBridge;
+			if (b && typeof b.snapshot === "function") {
+				const s = b.snapshot();
+				return s.elect + "/" + s.state + (s.buildId ? ("@" + String(s.buildId).slice(0, 8)) : "");
+			}
+		} catch (e) {}
+		return "none";
+	}
+
+	function updateBeacon() {
+		try {
+			const root = getGlobalRoot();
+			if (!root || !ensureBeacon(root)) return;
+			if (!_beaconText) return;
+			_beaconText.text = "LCT a=" + _attempts + " c=" + _lastContainerId + " m=" + (_mode || "-") +
+				" ui=" + (_uiAliveSeen || "0") + " br=" + bridgeSnapshot();
+		} catch (e) {}
+	}
+
 	/* ---------- JS 兜底 UI(BLoadLayout 失败/Tab 脚本判死时) ---------- */
 
 	function nameOf(key, v) {
@@ -388,7 +474,8 @@
 		} catch (_) {}
 
 		const container = findSettingsContainer(root);
-		if (!container) return null;
+		if (!container) { _lastContainerId = "none"; return null; }
+		_lastContainerId = String(container.id || "?");
 
 		let tab = null;
 		try { tab = $.CreatePanel("Panel", container, CHANNEL_ID); } catch (e) {
@@ -430,6 +517,15 @@
 			}
 		}
 		if (loaded) {
+			// 假成功防御:同步加载后 0 子面板 = 内容没真正进来,按失败处理走兜底
+			let kids = 0;
+			try { kids = tab.GetChildCount(); } catch (e) { kids = -1; }
+			if (kids <= 0) {
+				log("BLoadLayout returned true but panel has no children, treating as failure");
+				loaded = false;
+			}
+		}
+		if (loaded) {
 			_mode = "layout";
 			_instTicks = 0;
 			log("Injected settings tab (layout) into id=" + (container.id || "?"));
@@ -468,10 +564,12 @@
 			tab = injectTab(root);
 			if (tab) _instTicks = 0;
 		}
-		if (tab && !_mode) {
-			// 采用另一 context 注入的实例:按属性辨认它是 layout 还是兜底
+		if (tab && tab !== _lastPanel) {
+			// 实例更换(重注入/另一 context 重建):重新辨认 layout/兜底并重置心跳计数。
+			// 只在 _mode 为空时辨认,会把对方降级重建的兜底误判成 layout,引发两 context 互删乒乓。
 			try { _mode = (tab.GetAttributeString(ATTR_FALLBACK, "") === "1") ? "fallback" : "layout"; } catch (_) { _mode = "layout"; }
 			_instTicks = 0;
+			_lastPanel = tab;
 		}
 		_tab = tab;
 		return tab;
@@ -484,6 +582,7 @@
 		if (_mode === "layout") {
 			let alive = "";
 			try { alive = tab.GetAttributeString(ATTR_ALIVE, ""); } catch (_) {}
+			_uiAliveSeen = alive;
 			_instTicks++;
 			if (!alive && _instTicks > 6 && !_degraded) {
 				log("layout tab has no heartbeat, degrading to fallback");
@@ -550,6 +649,7 @@
 		} else if (_attempts <= 3 || _attempts % 60 === 0) {
 			log("settings container not found yet (attempt " + _attempts + ")");
 		}
+		updateBeacon();
 		try { $.Schedule(1.0, tick); } catch (_) {}
 	}
 
