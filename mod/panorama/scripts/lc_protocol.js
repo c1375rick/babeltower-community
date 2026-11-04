@@ -9,7 +9,9 @@
 	 *   下行  $.RegisterEventHandler("HTMLTitle", panel, ...)     —— LCT3A/R/C/E 四帧
 	 * 面板:chat.xml / hudchat.xml 声明的隐藏 CitadelHTMLPanel(id=LCTNet,probe 实证形态)
 	 *
-	 * 双 context(chat/hudchat)并行加载本文件,用根面板(root)属性选举:
+	 * 单实例运行于 hud.xml context(对局常驻可见树;escape 菜单的 include 已移除:
+ * 实测隐藏 context 的实例同样能赢得选举,但主角色落在隐藏树不可控)。
+ * 选举机制保留(根面板 root 属性):若未来多 context 并存,自动恢复互斥。
 	 *   lct_proto_owner / lct_proto_beat —— claim 后下一 tick 确认才上任,防止同帧双 claim。
 	 *   只有 primary 驱动面板;落选者与 primary 通过同一组状态属性对外表现一致。
 	 *
@@ -405,11 +407,14 @@
 					if (String(cpD.GetAttributeString("lct_escui", "")) === "1") eUi = "1";
 				}
 			} catch (eD) {}
+			// 状态/构建号读"发布值"(primary 写的属性),不是本地变量:
+			// 落选者的本地 statusText 永远是默认值,曾让 standby 行看起来像"卡在连接中"
+			const pub = statusInfo();
 			beacon.text = "LCT " + (beaconOnHud ? "H" : "R") + " " + ctx + " " + elect + "/" + state +
 				" st=" + attrSelfTest + " o=" + o + " b=" + bAge +
 				" e=" + eUi + " n=" + (panelSeen ? 1 : 0) + " d=" + (docLoaded ? 1 : 0) + " h=" + helloTries +
-				(buildId ? (" @" + String(buildId).slice(0, 8)) : "") +
-				" q=" + queue.length + " " + statusText;
+				" q=" + queue.length + " " + pub.text +
+				(pub.buildId ? (" @" + String(pub.buildId).slice(0, 8)) : "");
 		} catch (e) {}
 	}
 

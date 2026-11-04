@@ -27,7 +27,9 @@
 		<include src="s2r://panorama/scripts/lc_probe.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
-		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
+		<!-- lc_protocol 不在此引入:协议单实例运行于 hud.xml(对局常驻可见 context)。
+		     实测(信标 o=EscapeMenu b=0)本 context 的实例能赢得选举,但主角色落在
+		     对局中隐藏的菜单树不可控 —— QOLLOCK 同款原则:调度与协议只在 HUD context。 -->
 	</scripts>
 	<CitadelHudEscapeMenu oncancel="CitadelResumePlaying()">
 		<Panel id="EscapeBackground" onactivate="CitadelResumePlaying()" />
