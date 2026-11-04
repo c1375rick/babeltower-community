@@ -9,7 +9,7 @@
 	 *   下行  $.RegisterEventHandler("HTMLTitle", panel, ...)     —— LCT3A/R/C/E 四帧
 	 * 面板:chat.xml / hudchat.xml 声明的隐藏 CitadelHTMLPanel(id=LCTNet,probe 实证形态)
 	 *
-	 * 双 context(chat/hudchat)并行加载本文件,用 #Hud 属性选举:
+	 * 双 context(chat/hudchat)并行加载本文件,用根面板(root)属性选举:
 	 *   lct_proto_owner / lct_proto_beat —— claim 后下一 tick 确认才上任,防止同帧双 claim。
 	 *   只有 primary 驱动面板;落选者与 primary 通过同一组状态属性对外表现一致。
 	 *
@@ -184,15 +184,13 @@
 		}
 	}
 
+	// 选举/配置/状态属性的宿主 = 绝对根面板。QOLLOCK 生产实证:ql_persistence 以 root
+	// 为必需宿主(hud 只是次要副本),cloud_sync 双写 root+panel;对 CitadelHud 面板写
+	// 属性只有其未验证的 dev_tab 用过。v3 曾优先 FindChildTraverse("Hud")(= CitadelHud
+	// 面板),信标实证 elect 永远 idle——正是"存在但无效"型 API 假设翻车的形态
+	// (v2 census 铁律:typeof 检查 ≠ API 可用)。
 	function claimPanel() {
-		try {
-			const root = getGlobalRoot();
-			if (!root) return null;
-			const hud = root.FindChildTraverse("Hud");
-			return hud || root;
-		} catch (e) {
-			return null;
-		}
+		try { return getGlobalRoot(); } catch (e) { return null; }
 	}
 
 	function isValidPanel(p) {
@@ -392,10 +390,44 @@
 		try {
 			if (!ensureBeacon() || !beacon) return;
 			const ctx = String(myTag || "").split(".")[0] || "ctx";
+			// 诊断字段(信标期临时):st=属性自检,o=选举属性持有人 context 前缀,b=心跳年龄秒
+			let o = "";
+			let bAge = -1;
+			try {
+				const cpD = claimPanel();
+				if (cpD) {
+					o = String(cpD.GetAttributeString(OWNER_ATTR, "")).split(".")[0] || "";
+					const beatD = parseFloat(cpD.GetAttributeString(BEAT_ATTR, "0")) || 0;
+					if (beatD > 0) bAge = Math.max(0, Math.round((nowMs() - beatD) / 1000));
+				}
+			} catch (eD) {}
 			beacon.text = "LCT " + (beaconOnHud ? "H" : "R") + " " + ctx + " " + elect + "/" + state +
+				" st=" + attrSelfTest + " o=" + o + " b=" + bAge +
 				(buildId ? (" @" + String(buildId).slice(0, 8)) : "") +
 				" q=" + queue.length + " " + statusText;
 		} catch (e) {}
+	}
+
+	/* ---------- 属性通道自检(诊断期,定位选举卡死层级) ----------
+	 * v2 census 铁律:typeof 检查 ≠ API 可用(AsyncWebRequest 空壳先例)。
+	 * 对宿主面板做一次 写入→立即读回 对账,结果进信标:
+	 *   WW = 写入不抛且读回一致(通道真正可用)
+	 *   W_ = 写入不抛但读回为空(空壳桩,写入被静默丢弃)
+	 *   Wx = 写入不抛但读取抛异常
+	 *   -- = 写入抛异常;? = 未测;- = 无宿主面板
+	 */
+	let attrSelfTest = "?";
+
+	function runAttrSelfTest() {
+		const cp = claimPanel();
+		if (!cp) { attrSelfTest = "-"; return; }
+		const mark = "T" + (nowMs() % 1000000);
+		try {
+			cp.SetAttributeString("lct_selftest", mark);
+		} catch (eW) { attrSelfTest = "--"; return; }
+		try {
+			attrSelfTest = (cp.GetAttributeString("lct_selftest", "") === mark) ? "WW" : "W_";
+		} catch (eR) { attrSelfTest = "Wx"; }
 	}
 
 	/* ---------- 选举(双 context 并行,claim → 下一 tick 确认) ---------- */
@@ -984,6 +1016,7 @@
 		catch (eT) { myTag = ctxId + "." + reqCounter; }
 		log("boot tag=" + myTag);
 		applyConfig(null); // 先发布默认配置,设置窗口立即可渲染;store 回载后覆盖
+		runAttrSelfTest(); // 属性通道自检:结果进信标 st= 字段
 		electTick();
 	}
 

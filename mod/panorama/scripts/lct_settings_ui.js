@@ -70,15 +70,10 @@
 		}
 	}
 
-	// 共享面板:跨 context 属性通道的落点,与 lc_protocol.js 的 claimPanel() 同一选择
+	// 共享面板:跨 context 属性通道的落点 = 绝对根面板(与 lc_protocol.js 的 claimPanel()
+	// 同一选择;QOLLOCK 生产实证:ql_persistence 以 root 为必需宿主)
 	function sharedPanel() {
-		const root = globalRoot();
-		if (!root) return null;
-		try {
-			const hud = root.FindChildTraverse("Hud");
-			if (hud) return hud;
-		} catch (e0) {}
-		return root;
+		try { return globalRoot(); } catch (e0) { return null; }
 	}
 
 	function findById(id) {
