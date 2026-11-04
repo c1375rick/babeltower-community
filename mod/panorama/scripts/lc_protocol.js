@@ -415,6 +415,12 @@
 				" e=" + eUi + " n=" + (panelSeen ? 1 : 0) + " d=" + (docLoaded ? 1 : 0) + " h=" + helloTries +
 				" q=" + queue.length + " " + pub.text +
 				(pub.buildId ? (" @" + String(pub.buildId).slice(0, 8)) : "");
+			// 消息钩子诊断(lc_chat 写的根面板属性,消费方只追加不解析)
+			try {
+				const cpC = claimPanel();
+				const cs = cpC ? String(cpC.GetAttributeString("lct_chat", "")) : "";
+				if (cs) beacon.text += " [" + cs + "]";
+			} catch (eC) {}
 		} catch (e) {}
 	}
 

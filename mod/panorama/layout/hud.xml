@@ -7,6 +7,8 @@
         chat.xml 是自定义面板实例(CitadelChat),其布局脚本不执行 - 信标实证)
     2. 协议 CEF 面板 LCTNet 由 lc_protocol.js 按需 JS 创建到 #Hud
        (QOLLOCK 同款 $.CreatePanel("CitadelHTMLPanel") 形态,不在 XML 声明)
+    3. <scripts> 增加 lc_chat.vjs_c - 消息钩子(轮询 ChatMessages,经 LCTBridge
+       翻译,双语注入;不修改本布局其余任何内容,零漂移)
   注意:每次游戏更新后必须重新比对原版,任何漂移都会破坏整个对局 HUD。
 -->
 <root>
@@ -23,6 +25,9 @@
 		<!-- 诊断探针:同步静态 Label,证明本布局 scripts 求值(与 lc_protocol 存活解耦) -->
 		<include src="s2r://panorama/scripts/lc_probe.vjs_c" />
 		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
+		<!-- BabelTower: 消息钩子(轮询 #ChatMessages → LCTBridge.translate → 双语注入)。
+		     必须在 lc_protocol 之后装载(消费其 globalThis.LCTBridge)。 -->
+		<include src="s2r://panorama/scripts/lc_chat.vjs_c" />
 	</scripts>
 
 	<snippets>
