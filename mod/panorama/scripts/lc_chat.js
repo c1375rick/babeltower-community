@@ -253,8 +253,11 @@
 		return [record.channel || "", record.sender || "", record.text || ""].join("\x00");
 	}
 
-	function isTargetLanguageText(text) {
-		const t = targetLanguage().toLowerCase();
+	function isTargetLanguageText(text, tgt) {
+		// tgt 缺省 = 入站目标(cfg.targetLanguage);出站跳过判定必须显式传发送目标
+		// (cfg.outgoingTarget)——入站 zh + 发送 en 的典型配置下,用户打的英文若按入站
+		// 目标判定会被误送 en→en(2026-11-04 实车日志 "out request en->en" 实证)
+		const t = String(tgt || targetLanguage()).toLowerCase();
 		const s = String(text || "");
 		// 通用规则(用户要求举一反三):含"目标文字系统"信号且不含任何其它文字系统信号
 		// → 已达标跳过;纯外文或混合(目标文+外文)一律送翻 —— 与整句翻译策略一致。
@@ -806,12 +809,13 @@
 		if (!trimmed) return; // 空输入:原生同样无操作
 		const c = cfg();
 		const mode = String(c.outgoing || "off");
+		const tgt = outTarget(); // 跳过判定与翻译请求都用发送目标(非入站目标)
 		let skipReason = "";
 		if (c.enabled === false) skipReason = "disabled";
 		else if (mode === "off") skipReason = "mode=off";
 		else if (trimmed.charAt(0) === "/" || trimmed.charAt(0) === "!") skipReason = "command";
 		else if (!/\p{L}/u.test(trimmed)) skipReason = "no-letters";
-		else if (isTargetLanguageText(trimmed)) skipReason = "already-target";
+		else if (isTargetLanguageText(trimmed, tgt)) skipReason = "already-target";
 		if (skipReason) {
 			log("out skip (" + skipReason + "): " + snip(trimmed, 48));
 			sendNow(trimmed); // 原样放行(input.text 已是原文,sendNow 只走派发+清理)
@@ -826,7 +830,6 @@
 		State.outPending = trimmed;
 		try { input.text = ""; } catch (e) {} // 立即清空:视觉反馈已捕获,防重复整条输入
 		const seq = (State.outSeq += 1);
-		const tgt = outTarget();
 		const src = detectSourceCode(trimmed);
 		log("out request " + src + "->" + tgt + " (" + mode + "): " + snip(trimmed, 60));
 		try {
@@ -840,8 +843,10 @@
 					const tr = (res && res.ok && items && items.length &&
 						typeof items[0].t === "string") ? String(items[0].t).trim() : "";
 					if (!tr || tr === trimmed) {
-						// 翻译不可用/超时/未变:原文照发,绝不吞(v2 生产教训)
-						log("out unavailable (" + (res && res.code ? res.code : "no_response") + ") -> original");
+						// 翻译不可用/超时/未变:原文照发,绝不吞(v2 生产教训)。
+						// 日志三分:no_response=回调没来 / 错误码 / unchanged|empty=桥正常但没实质翻译
+						log("out unavailable (" + (res ? (res.ok ? (tr === trimmed ? "unchanged" : "empty")
+							: String(res.code || "error")) : "no_response") + ") -> original");
 						sendNow(trimmed);
 						return;
 					}

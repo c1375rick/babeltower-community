@@ -145,7 +145,12 @@
 			lastCfgRaw = raw;
 			const obj = JSON.parse(raw);
 			cfgObj = canonicalCfg(obj);
-			if (!first) persistCfg(raw);
+			if (!first) {
+				persistCfg(raw);
+				// 外部(设置窗口)改动的采纳必须有日志:跳过判定依赖 cfg,排查时
+				// 需要知道"测试中途配置被改过"(2026-11-04 en->en 排查耗时教训)
+				try { log("cfg adopted (external): " + raw.slice(0, 120)); } catch (e2) {}
+			}
 		} catch (e) { /* 坏 JSON:记账已前移,不重试不刷屏 */ }
 	}
 
