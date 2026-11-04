@@ -14,7 +14,10 @@
 	border: 1px solid rgba(110, 168, 255, 0.35);
 	border-radius: 8px;
 	box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.6);
-	padding: 14px 18px 12px 18px;
+	padding: 16px 18px 12px 18px;
+	/* 流向显式化(游戏 CSS 实证:Valve 每个容器都写,不依赖默认值);
+	   标题带塌缩时选项行会精确叠上标题(2026-11-04 用户实测报告) */
+	flow-children: down;
 	visibility: collapse;
 	overflow: squish scroll;
 	/* 窗口前移到 EscapeBackground 之后(QOLLOCK 结构),必须显式压过后续菜单层 */
@@ -27,15 +30,18 @@
 .LCTTab {
 	width: 100%;
 	flow-children: down;
-	padding: 2px 0px 0px 0px;
+	padding: 4px 0px 0px 0px;
 }
 
 /* ---- 头部 ---- */
 .LCTHeader {
 	flow-children: right;
 	width: 100%;
-	padding-bottom: 8px;
-	margin-bottom: 4px;
+	/* 高度显式锁定:标题带高度不依赖字体度量,任何情况下选项行都不会叠上标题
+	   (border-box:40 = 关闭钮 28 + padding-bottom 10 + 2 余量) */
+	height: 40px;
+	padding-bottom: 10px;
+	margin-bottom: 8px;
 	border-bottom: 1px solid rgba(110, 168, 255, 0.28);
 }
 .LCTHeaderText {
