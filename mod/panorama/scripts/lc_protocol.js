@@ -44,15 +44,15 @@
 	// 监听外部变更 → 采纳 + store.put 落盘。见 docs/PROTOCOL.md §10。
 	const CFG_ATTR = "lct_cfg";
 
-	const HELLO_TIMEOUT = 4;      // §8
+	const HELLO_TIMEOUT = 4;      // §8($.Schedule 单位:秒)
 	const HELLO_ATTEMPTS = 3;     // §9 超时×3 → OFFLINE
 	const TR_TIMEOUT = 8;         // §8
 	const CHUNK_TIMEOUT = 3;      // §8 每片
 	const STORE_TIMEOUT = 8;
 	const QUEUE_MAX = 64;         // §9
-	const QUEUE_TTL = 30;         // §9
-	const ELECT_PERIOD = 1.0;
-	const BEAT_STALE = 5;
+	const QUEUE_TTL = 30000;      // §9 ms(Date.now 时基)
+	const ELECT_PERIOD = 1.0;     // $.Schedule 单位:秒
+	const BEAT_STALE = 5000;      // ms:心跳超过 5s 视为失效
 
 	/* ---------- 状态 ---------- */
 
@@ -150,8 +150,13 @@
 	function log(msg) {
 		try { $.Msg(TAG + " " + msg); } catch (e) {}
 	}
+	// 时间源:Date.now()(QOLLOCK 生产实证,全库 55 处取时零 $.Time;
+	// $.Time 在 Deadlock Panorama 存疑,boot 曾疑因它静默暴毙)。一律毫秒。
+	function nowMs() {
+		try { return (typeof Date !== "undefined" && Date.now) ? Date.now() : (new Date()).getTime(); } catch (e) { return 0; }
+	}
 	function ts() {
-		try { return Math.floor($.Time() * 1000); } catch (e) { return 0; }
+		return nowMs();
 	}
 	function later(sec, fn) {
 		const g = gen;
@@ -327,11 +332,13 @@
 
 	/* ---------- 诊断信标(临时,稳定后移除) ----------
 	 * con_logfile 实证抓不到 PanoramaScript 行,诊断只能靠画面自报。
-	 * 形态:单个 Label(自动尺寸)。锚点:#Hud 优先(QOLLOCK 实证 id),
-	 * 找不到则落当前树的全局根并标记 R —— 信标文本的 H/R 前缀直接暴露
-	 * FindChildTraverse("Hud") 是否成功。跨 context 去重按锚点子树内查重。
-	 * 诊断期任何 context 都写文本:信标可见 = 本文件确实在跑;文本里的
-	 * ctx 字段 = 宿主 context id(如 Hud/EscapeMenu),双实例并存时文本交替
+	 * 形态:单个 Label。锚点:FindChildTraverse("Hud") 命中则挂其下并标记 H;
+	 * 未命中则落当前树的全局根并标记 R —— 当前游戏 hud.xml 的 CitadelHud 无 id
+	 * (QOLLOCK findHud 同样以 paneltype==="CitadelHud" 兜底),所以 R 是预期值。
+	 * 样式 = QOLLOCK visual_check.js 浮动面板实证配方(左上对齐 + 显式宽高 +
+	 * 独立 margin + zIndex),避免落在 flow 堆叠末尾被顶出屏外。
+	 * 跨 context 去重按锚点子树内查重。诊断期任何 context 都写文本:信标可见 =
+	 * 本文件确实在跑;文本里的 ctx 字段 = 宿主 context id,双实例并存时文本交替
 	 * 本身就是"多个 context 都活着"的证据。
 	 */
 	let beacon = null;
@@ -358,15 +365,19 @@
 			} catch (e0) {}
 			const b = $.CreatePanel("Label", anchor, "LCTBeacon");
 			if (!b) return false;
+			// QOLLOCK visual_check.js 实证配方:Object.assign / 左上对齐 / 显式宽高 / zIndex
 			const safe = function (k, v) { try { b.style[k] = v; } catch (eS) {} };
 			safe("horizontalAlign", "left");
-			safe("verticalAlign", "bottom");
-			safe("margin", "12px");
-			safe("backgroundColor", "rgba(8, 12, 20, 0.85)");
-			safe("borderRadius", "4px");
-			safe("padding", "4px 8px");
-			safe("fontSize", "11px");
+			safe("verticalAlign", "top");
+			safe("marginLeft", "20px");
+			safe("marginTop", "72px");
+			safe("width", "680px");
+			safe("height", "22px");
+			safe("backgroundColor", "#000000cc");
+			safe("fontSize", "13px");
 			safe("color", "#9fe0a8");
+			safe("whiteSpace", "normal");
+			safe("zIndex", "8999");
 			safe("visibility", "visible");
 			try { b.hittest = false; } catch (e2) {}
 			try { b.acceptsfocus = false; } catch (e3) {}
@@ -399,7 +410,7 @@
 				let beat = 0;
 				try { owner = cp.GetAttributeString(OWNER_ATTR, ""); } catch (e) {}
 				try { beat = parseFloat(cp.GetAttributeString(BEAT_ATTR, "0")) || 0; } catch (e2) {}
-				const now = $.Time();
+				const now = nowMs();
 				if (elect === "primary") {
 					if (owner === myTag) {
 						try { cp.SetAttributeString(BEAT_ATTR, String(now)); } catch (e3) {}
@@ -431,7 +442,7 @@
 		} catch (eC) {}
 		if (elect === "primary") persistStatusAttrs(); // 供设置窗口 footer 跨 context 直读
 		updateBeacon();
-		$.Schedule(ELECT_PERIOD, electTick);
+		if (typeof $.Schedule === "function") { try { $.Schedule(ELECT_PERIOD, electTick); } catch (eS) {} }
 	}
 
 	function becomePrimary() {
@@ -595,7 +606,7 @@
 
 	function nextId() {
 		reqCounter += 1;
-		return "r" + reqCounter.toString(36) + "." + Math.floor($.Time() % 100000);
+		return "r" + reqCounter.toString(36) + "." + nowMs().toString(36);
 	}
 
 	function enqueue(item) {
@@ -619,7 +630,7 @@
 		if (elect !== "primary" || active || state !== "READY") return;
 		while (queue.length > 0) {
 			const item = queue.shift();
-			if (item.kind === "tr" && ($.Time() - item.enqueuedAt) > QUEUE_TTL) {
+			if (item.kind === "tr" && (nowMs() - item.enqueuedAt) > QUEUE_TTL) {
 				safeCb(item.cb, { ok: false, code: "TIMEOUT", detail: "ttl", retryable: false });
 				continue;
 			}
@@ -938,7 +949,7 @@
 			mode: String(opts.mode || "incoming"),
 			items: norm
 		};
-		enqueue({ kind: "tr", d: d, cb: cb, enqueuedAt: $.Time(), r: 0 });
+		enqueue({ kind: "tr", d: d, cb: cb, enqueuedAt: nowMs(), r: 0 });
 		pumpQueue();
 	}
 
@@ -967,11 +978,18 @@
 		let ctxId = "ctx";
 		try { ctxId = String(($.GetContextPanel() && $.GetContextPanel().id) || "ctx"); } catch (e) {}
 		reqCounter += 1;
-		myTag = ctxId + "." + Math.floor($.Time() * 1000) + "." + reqCounter;
+		// 此行曾用 $.Time() 且无守卫:运行时不存在该 API 即 TypeError → boot 静默暴毙
+		// → 选举/信标/cfg 全部无法启动(恰为三轮实测的全部症状)。
+		try { myTag = ctxId + "." + nowMs() + "." + reqCounter; }
+		catch (eT) { myTag = ctxId + "." + reqCounter; }
 		log("boot tag=" + myTag);
 		applyConfig(null); // 先发布默认配置,设置窗口立即可渲染;store 回载后覆盖
 		electTick();
 	}
 
-	try { $.Schedule(0.2, boot); } catch (e) { boot(); }
+	if (typeof $.Schedule === "function") {
+		try { $.Schedule(0.2, boot); } catch (e) { boot(); }
+	} else {
+		boot();
+	}
 })();

@@ -59,7 +59,9 @@
 	}
 
 	function nowMs() {
-		try { return Math.floor($.Time() * 1000); } catch (e) { return 0; }
+		// 时间源:Date.now()(QOLLOCK 生产实证,全库 55 处,零 $.Time);
+		// $.Time 在 Deadlock Panorama 存疑,不赌。
+		try { return (typeof Date !== "undefined" && Date.now) ? Date.now() : (new Date()).getTime(); } catch (e) { return 0; }
 	}
 
 	let cancelConsumedUntil = 0;

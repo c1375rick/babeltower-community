@@ -23,6 +23,8 @@
 		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
+		<!-- 诊断探针:同步静态 Label,证明本布局 scripts 求值(与 lc_protocol 存活解耦) -->
+		<include src="s2r://panorama/scripts/lc_probe.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
 		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
