@@ -22,11 +22,12 @@
 		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
-		<!-- 诊断探针:同步静态 Label,证明本布局 scripts 求值(与 lc_protocol 存活解耦) -->
-		<include src="s2r://panorama/scripts/lc_probe.vjs_c" />
 		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
-		<!-- BabelTower: 消息钩子(轮询 #ChatMessages → LCTBridge.translate → 双语注入)。
-		     必须在 lc_protocol 之后装载(消费其 globalThis.LCTBridge)。 -->
+		<!-- BabelTower: 消息钩子(轮询 #ChatMessages → LCTBridge.translate → 双语注入)
+		     + 出站翻译(#ChatInput oninputsubmit 接管)。必须在 lc_protocol 之后装载
+		     (消费其 globalThis.LCTBridge)。
+		     诊断不再用画面信标:$.Msg 进 console.log(游戏带 -condebug 启动时,
+		     game\citadel\console.log,行首 [PanoramaScript] [LCT] 前缀,见 docs/DEBUG.md) -->
 		<include src="s2r://panorama/scripts/lc_chat.vjs_c" />
 	</scripts>
 

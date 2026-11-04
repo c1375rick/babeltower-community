@@ -66,7 +66,6 @@
 	let panelBound = false;
 	let docLoaded = false;
 	let waitingLoad = false;
-	let panelSeen = false;        // ensurePanel 至少成功过一次(信标 n= 字段)
 
 	let lastSeq = 0;
 	let tok = 0;
@@ -253,7 +252,6 @@
 			panel = p;
 			panelBound = false;
 		}
-		panelSeen = true;
 		bindPanel();
 		return panel;
 	}
@@ -332,120 +330,6 @@
 		} catch (e) {}
 	}
 
-	/* ---------- 诊断信标(临时,稳定后移除) ----------
-	 * con_logfile 实证抓不到 PanoramaScript 行,诊断只能靠画面自报。
-	 * 形态:单个 Label。锚点:FindChildTraverse("Hud") 命中则挂其下并标记 H;
-	 * 未命中则落当前树的全局根并标记 R —— 当前游戏 hud.xml 的 CitadelHud 无 id
-	 * (QOLLOCK findHud 同样以 paneltype==="CitadelHud" 兜底),所以 R 是预期值。
-	 * 样式 = QOLLOCK visual_check.js 浮动面板实证配方(左上对齐 + 显式宽高 +
-	 * 独立 margin + zIndex),避免落在 flow 堆叠末尾被顶出屏外。
-	 * 跨 context 去重按锚点子树内查重。诊断期任何 context 都写文本:信标可见 =
-	 * 本文件确实在跑;文本里的 ctx 字段 = 宿主 context id,双实例并存时文本交替
-	 * 本身就是"多个 context 都活着"的证据。
-	 */
-	let beacon = null;
-	let beaconOnHud = false;
-
-	function ensureBeacon() {
-		if (beacon) {
-			let ok = true;
-			try { ok = beacon.IsValid(); } catch (e) { ok = false; }
-			if (ok) return true;
-			beacon = null;
-		}
-		try {
-			const root = getGlobalRoot();
-			if (!root) return false;
-			let anchor = null;
-			try { anchor = root.FindChildTraverse("Hud"); } catch (e1) {}
-			beaconOnHud = !!anchor;
-			if (!anchor) anchor = root;
-			// 跨 context 去重:同锚点子树内已建则直接采用
-			try {
-				const exist = anchor.FindChildTraverse("LCTBeacon");
-				if (exist) { beacon = exist; return true; }
-			} catch (e0) {}
-			const b = $.CreatePanel("Label", anchor, "LCTBeacon");
-			if (!b) return false;
-			// QOLLOCK visual_check.js 实证配方:Object.assign / 左上对齐 / 显式宽高 / zIndex
-			const safe = function (k, v) { try { b.style[k] = v; } catch (eS) {} };
-			safe("horizontalAlign", "left");
-			safe("verticalAlign", "top");
-			safe("marginLeft", "20px");
-			safe("marginTop", "72px");
-			safe("width", "820px");
-			safe("height", "22px");
-			safe("backgroundColor", "#000000cc");
-			safe("fontSize", "13px");
-			safe("color", "#9fe0a8");
-			safe("whiteSpace", "normal");
-			safe("zIndex", "8999");
-			safe("visibility", "visible");
-			try { b.hittest = false; } catch (e2) {}
-			try { b.acceptsfocus = false; } catch (e3) {}
-			beacon = b;
-			return true;
-		} catch (e) {
-			return false;
-		}
-	}
-
-	function updateBeacon() {
-		try {
-			if (!ensureBeacon() || !beacon) return;
-			const ctx = String(myTag || "").split(".")[0] || "ctx";
-			// 诊断字段(信标期临时):st=属性自检,o=选举属性持有人 context 前缀,b=心跳年龄秒
-			let o = "";
-			let bAge = -1;
-			let eUi = "0";
-			try {
-				const cpD = claimPanel();
-				if (cpD) {
-					o = String(cpD.GetAttributeString(OWNER_ATTR, "")).split(".")[0] || "";
-					const beatD = parseFloat(cpD.GetAttributeString(BEAT_ATTR, "0")) || 0;
-					if (beatD > 0) bAge = Math.max(0, Math.round((nowMs() - beatD) / 1000));
-					if (String(cpD.GetAttributeString("lct_escui", "")) === "1") eUi = "1";
-				}
-			} catch (eD) {}
-			// 状态/构建号读"发布值"(primary 写的属性),不是本地变量:
-			// 落选者的本地 statusText 永远是默认值,曾让 standby 行看起来像"卡在连接中"
-			const pub = statusInfo();
-			beacon.text = "LCT " + (beaconOnHud ? "H" : "R") + " " + ctx + " " + elect + "/" + state +
-				" st=" + attrSelfTest + " o=" + o + " b=" + bAge +
-				" e=" + eUi + " n=" + (panelSeen ? 1 : 0) + " d=" + (docLoaded ? 1 : 0) + " h=" + helloTries +
-				" q=" + queue.length + " " + pub.text +
-				(pub.buildId ? (" @" + String(pub.buildId).slice(0, 8)) : "");
-			// 消息钩子诊断(lc_chat 写的根面板属性,消费方只追加不解析)
-			try {
-				const cpC = claimPanel();
-				const cs = cpC ? String(cpC.GetAttributeString("lct_chat", "")) : "";
-				if (cs) beacon.text += " [" + cs + "]";
-			} catch (eC) {}
-		} catch (e) {}
-	}
-
-	/* ---------- 属性通道自检(诊断期,定位选举卡死层级) ----------
-	 * v2 census 铁律:typeof 检查 ≠ API 可用(AsyncWebRequest 空壳先例)。
-	 * 对宿主面板做一次 写入→立即读回 对账,结果进信标:
-	 *   WW = 写入不抛且读回一致(通道真正可用)
-	 *   W_ = 写入不抛但读回为空(空壳桩,写入被静默丢弃)
-	 *   Wx = 写入不抛但读取抛异常
-	 *   -- = 写入抛异常;? = 未测;- = 无宿主面板
-	 */
-	let attrSelfTest = "?";
-
-	function runAttrSelfTest() {
-		const cp = claimPanel();
-		if (!cp) { attrSelfTest = "-"; return; }
-		const mark = "T" + (nowMs() % 1000000);
-		try {
-			cp.SetAttributeString("lct_selftest", mark);
-		} catch (eW) { attrSelfTest = "--"; return; }
-		try {
-			attrSelfTest = (cp.GetAttributeString("lct_selftest", "") === mark) ? "WW" : "W_";
-		} catch (eR) { attrSelfTest = "Wx"; }
-	}
-
 	/* ---------- 选举(双 context 并行,claim → 下一 tick 确认) ---------- */
 
 	function electTick() {
@@ -483,13 +367,12 @@
 				}
 			}
 		} catch (eX) {}
-		// 配置监听(双 context 都跑;只有 primary 会真正落盘)+ 状态/信标刷新
+		// 配置监听(双 context 都跑;只有 primary 会真正落盘)+ 状态发布
 		try {
 			const cpCfg = claimPanel();
 			if (cpCfg) cfgWatchTick(cpCfg);
 		} catch (eC) {}
 		if (elect === "primary") persistStatusAttrs(); // 供设置窗口 footer 跨 context 直读
-		updateBeacon();
 		if (typeof $.Schedule === "function") { try { $.Schedule(ELECT_PERIOD, electTick); } catch (eS) {} }
 	}
 
@@ -1032,7 +915,6 @@
 		catch (eT) { myTag = ctxId + "." + reqCounter; }
 		log("boot tag=" + myTag);
 		applyConfig(null); // 先发布默认配置,设置窗口立即可渲染;store 回载后覆盖
-		runAttrSelfTest(); // 属性通道自检:结果进信标 st= 字段
 		electTick();
 	}
 

@@ -18,7 +18,19 @@
 	 * 与 v2 的刻意差异(后续阶段补齐):
 	 *   - 混合消息不做片段拆分,整句送翻(用户决策:模组从简)
 	 *   - 无 quickchat 模板库 → Ping 行只在"已是目标语言"时跳过(v2 2026-10-28 收紧逻辑的可行子集)
-	 *   - 无专名保护/出站翻译/游戏名占位
+	 *   - 无专名保护/游戏名占位
+ *
+ * 出站翻译(v2 exp6734C 生产模式收敛版):
+ *   - v2 靠 chat.xml shadow 换 oninputsubmit 属性;v3 不做 shadow(chat 布局漂移 = FATAL),
+ *     改在 hud context 对 #ChatInput 面板 SetPanelEvent("oninputsubmit", hook)
+ *     (SetPanelEvent 本 build 实证:DLMusic dlmusic_main.js / QOLLOCK ql_statlocker 同款 API;
+ *      跨 context 调用是新增假设,失败形态 = 出站不生效,聊天本体不受影响)
+ *   - 实际发送 = poker 生产配方:input.text 就位 → $.DispatchEvent("CitadelChatInputSubmitted", input)
+ *     (poker_chat_debug.js flushRequestedChat 同款;焦点用 DropInputFocus 交还,让原生
+ *      onblur 属性链自己走 CitadelChatInputBlur)
+ *   - 命令(/、!)、未启用、已是发送目标语言 → 原样放行;翻译 3s 不回 → 原文照发,绝不吞消息
+ *   - 发送目标语言 = cfg.outgoingTarget(设置面板下拉,默认 en);模式 cfg.outgoing
+ *     (off/translation/bilingual,默认 off——与 v2 一致,要在 Esc 菜单打开)
 	 *
 	 * v2 教训内嵌:
 	 *   - 气泡先建、文本延迟填充 → 水位线 + 每轮尾部补扫 + 空行观察表(TTL 5s)
@@ -51,8 +63,11 @@
 	const SENDER_NAME_CLASS = "SenderName";
 	const CHANNEL_NAME_CLASS = "ChannelName";
 	const OWN_PANEL_CLASS = "SenderLocalClient";
+	const CHAT_INPUT_ID = "ChatInput";       // 游戏 chat.xml TextEntry(跨 context 面板访问,v3 收消息已实证)
 	// 译文标签标记类:chat 树没有我们的 CSS(样式走内联),此类只作 resetRowModState 的识别标记
 	const TRANS_CLASS = "LCTTranslation";
+	const OUT_WATCHDOG = 3.0;      // 出站等翻译预算(秒):超时原文照发,聊天不能等协议 8s+重试
+	const OUT_MAX_SEND = 400;      // v2 同款发送长度保护(游戏聊天有上限,拼接过长被截/失败)
 	const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff]/; // 汉字(中日共用,日文靠假名信号区分)
 	const RE_KANA = /[\u3040-\u30ff]/;             // 假名 —— 日文铁证(中文没有假名)
 	const RE_HANGUL = /[\uac00-\ud7af]/;           // 谚文 —— 韩文
@@ -435,7 +450,6 @@
 			}
 			// 行已失效(游戏回收/清理)→ 丢弃;同文新行会经缓存路径恢复
 		}
-		State.lastNote = snip(display, 24);
 	}
 
 	function failJob(job, err) {
@@ -457,8 +471,6 @@
 				}
 			}
 		}
-		State.nFail += 1;
-		State.lastNote = "ERR " + snip(err, 20);
 		log("failed: " + snip(err, 80));
 	}
 
@@ -482,7 +494,6 @@
 					if (res && res.ok) {
 						const items = res.items || [];
 						const out = (items.length && items[0] && typeof items[0].t === "string") ? items[0].t : "";
-						State.nOk += 1;
 						deliver(job.group, out);
 					} else {
 						failJob(job, res ? (String(res.code || "UNKNOWN") + (res.detail ? ":" + res.detail : "")) : "no_response");
@@ -596,7 +607,6 @@
 		trimSeen();
 
 		if (skip) return false;
-		State.nNew += 1;
 		const cached = State.cache.get(textKeyOf(record.text));
 		if (cached) {
 			injectTranslation(row, sig, cached);
@@ -650,19 +660,151 @@
 		return touched;
 	}
 
-	/* ---------- 诊断(根面板属性 → lc_protocol 信标追加显示) ---------- */
+	/* ---------- 出站翻译(发送前翻译,hud context 接管 #ChatInput) ---------- */
 
-	function publishStats(touched) {
-		const now = nowMs();
-		if (!touched && now - State.statAt < 2000) return;
-		State.statAt = now;
+	function outTarget() {
+		return String(cfg().outgoingTarget || "en");
+	}
+
+	function chatInput() {
+		return findChild(getRoot(), CHAT_INPUT_ID);
+	}
+
+	// 实际发送:poker 生产配方(input.text 就位 → 派发事件,真正发送方在游戏侧监听)
+	function stockSubmit(input) {
+		try { $.DispatchEvent("CitadelChatInputSubmitted", input); } catch (e) {
+			log("submit dispatch failed: " + expErr(e));
+		}
+	}
+
+	// 焦点交还游戏:DropInputFocus(poker 实证事件)→ 原生 onblur 属性链自己走
+	// CitadelChatInputBlur,聊天窗口收起等原生行为不丢
+	function dropFocus(input) {
+		try { $.DispatchEvent("DropInputFocus", input); } catch (e) {}
+	}
+
+	// 就位发送 + 焦点处理。用户在等待翻译期间已输入新文字 → 发送后恢复之(不抢焦点)
+	function sendNow(text) {
+		const input = chatInput();
+		if (!isValid(input)) return;
+		let cur = "";
+		try { cur = String(input.text || ""); } catch (e) {}
+		const typing = !!(cur && cur !== text);
+		try { input.text = text; } catch (e) { return; }
+		stockSubmit(input);
+		try { input.text = ""; } catch (e) {}
+		if (typing) {
+			try { input.text = cur; } catch (e) {}
+		} else {
+			dropFocus(input);
+		}
+	}
+
+	function onInputSubmit() {
+		const input = chatInput();
+		if (!input) return;
+		let raw = "";
+		try { raw = String(input.text || ""); } catch (e) { return; }
+		const trimmed = raw.trim();
+		if (!trimmed) return; // 空输入:原生同样无操作
+		const c = cfg();
+		const mode = String(c.outgoing || "off");
+		let skipReason = "";
+		if (c.enabled === false) skipReason = "disabled";
+		else if (mode === "off") skipReason = "mode=off";
+		else if (trimmed.charAt(0) === "/" || trimmed.charAt(0) === "!") skipReason = "command";
+		else if (!/\p{L}/u.test(trimmed)) skipReason = "no-letters";
+		else if (isTargetLanguageText(trimmed)) skipReason = "already-target";
+		if (skipReason) {
+			log("out skip (" + skipReason + "): " + snip(trimmed, 48));
+			sendNow(trimmed); // 原样放行(input.text 已是原文,sendNow 只走派发+清理)
+			return;
+		}
+		// 同文本翻译中重复 Enter → 原样立即发(v2 2026-10-31 实车:吞消息更糟)
+		if (State.outPending === trimmed) {
+			log("out dedupe: same text pending -> verbatim");
+			sendNow(trimmed);
+			return;
+		}
+		State.outPending = trimmed;
+		try { input.text = ""; } catch (e) {} // 立即清空:视觉反馈已捕获,防重复整条输入
+		const seq = (State.outSeq += 1);
+		const tgt = outTarget();
+		const src = detectSourceCode(trimmed);
+		log("out request " + src + "->" + tgt + " (" + mode + "): " + snip(trimmed, 60));
 		try {
-			const root = getRoot();
-			if (!root || !root.SetAttributeString) return;
-			root.SetAttributeString("lct_chat",
-				"c n=" + State.nNew + " ok=" + State.nOk + " f=" + State.nFail +
-				" q=" + State.queue.length + (State.lastNote ? " " + State.lastNote : ""));
-		} catch (e) {}
+			globalThis.LCTBridge.translate(
+				[{ i: 0, t: trimmed }],
+				{ target: tgt, source: src, mode: "outgoing" },
+				function (res) {
+					if (seq !== State.outSeq) return; // 看门狗已放行 / 更新提交已接管
+					State.outPending = null;
+					const items = res && res.items;
+					const tr = (res && res.ok && items && items.length &&
+						typeof items[0].t === "string") ? String(items[0].t).trim() : "";
+					if (!tr || tr === trimmed) {
+						// 翻译不可用/超时/未变:原文照发,绝不吞(v2 生产教训)
+						log("out unavailable (" + (res && res.code ? res.code : "no_response") + ") -> original");
+						sendNow(trimmed);
+						return;
+					}
+					let send = tr;
+					if (mode === "bilingual") send = trimmed + " | " + tr;
+					if (send.length > OUT_MAX_SEND) {
+						if (mode === "bilingual") {
+							const budget = Math.max(0, OUT_MAX_SEND - trimmed.length - 3);
+							send = trimmed + " | " + (tr.length > budget ? tr.slice(0, budget) + "…" : tr);
+						} else {
+							send = send.slice(0, OUT_MAX_SEND) + "…";
+						}
+					}
+					log("out sent [" + mode + "]: " + snip(send, 80));
+					sendNow(send);
+				}
+			);
+		} catch (eT) {
+			if (seq === State.outSeq) { State.outPending = null; State.outSeq += 1; }
+			log("out translate throw: " + expErr(eT) + " -> original");
+			sendNow(trimmed);
+			return;
+		}
+		// 看门狗:聊天消息不能等协议 8s 超时+重试,3s 不回就原文放行
+		try {
+			$.Schedule(OUT_WATCHDOG, function () {
+				if (seq === State.outSeq && State.outPending === trimmed) {
+					State.outSeq += 1; // 迟到的翻译回调就此作废
+					State.outPending = null;
+					log("out watchdog " + OUT_WATCHDOG + "s -> original");
+					sendNow(trimmed);
+				}
+			});
+		} catch (eW) {}
+	}
+
+	// 挂钩维护:#ChatInput 面板就绪后 SetPanelEvent 接管 oninputsubmit;
+	// UI 重建(context 销毁/对局重载)后面板换新 → 重挂。每 tick 调用,代价一次 FindChildTraverse。
+	function maintainOutgoingHook() {
+		const input = chatInput();
+		if (!input) return;
+		if (State.outHooked && State.outInput === input) return;
+		if (typeof input.SetPanelEvent !== "function") {
+			if (!State.outHookWarned) {
+				State.outHookWarned = true;
+				log("ChatInput.SetPanelEvent missing - outgoing disabled (incoming unaffected)");
+			}
+			return;
+		}
+		try {
+			input.SetPanelEvent("oninputsubmit", onInputSubmit);
+			State.outHooked = true;
+			State.outInput = input;
+			log("outgoing hook installed (SetPanelEvent oninputsubmit on #ChatInput)");
+		} catch (e) {
+			if (!State.outHookWarned) {
+				State.outHookWarned = true;
+				log("outgoing hook install failed: " + expErr(e));
+			}
+		}
 	}
 
 	/* ---------- 主循环 ---------- */
@@ -674,7 +816,7 @@
 		} catch (e) {
 			log("scan error: " + expErr(e));
 		}
-		publishStats(touched);
+		try { maintainOutgoingHook(); } catch (eH) {}
 		const hasWork = touched || State.queue.length > 0 || !!State.active;
 		try { $.Schedule(hasWork ? FAST_POLL : SLOW_POLL, tick); } catch (e) {}
 	}
@@ -707,9 +849,11 @@
 		pendingFill: new Map(),// row -> 观察截止时间(空行文本延迟填充)
 		queue: [],             // 待翻译任务
 		active: null,          // 在飞任务(单槽)
-		nNew: 0, nOk: 0, nFail: 0,
-		lastNote: "",
-		statAt: 0
+		outPending: null,      // 出站:翻译中的原文(去重 + 看门狗判定)
+		outSeq: 0,             // 出站提交序号:看门狗放行/新提交后,迟到回调作废
+		outInput: null,        // 已挂钩的 ChatInput 面板(UI 重建 → 重挂)
+		outHooked: false,
+		outHookWarned: false
 	};
 
 	log("loaded (hud context message hook)");
