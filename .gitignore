@@ -3,3 +3,5 @@ dist/
 _reference/
 _qollock-ref/
 _build_check/
+_compat/panorama/
+_compat/addoninfo.txt

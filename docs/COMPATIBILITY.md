@@ -65,7 +65,7 @@
 **设计**:超集 = 当前游戏底稿 + 本 mod 插入 + QOL 插入。
 
 - QOL 的 `hud.xml` 相对游戏底稿**只加 include、不加面板**(实测 diff:2 条样式 include + ~82 条脚本 include + 1 行 `GlobalClassListener`;唯一结构差异是旧底稿缺 `gMinimapTargeting`,属游戏版本漂移非 QOL 特性)→ 合并 = 我们的 `hud.xml` + QOL 的 include 行。**官方所有权文档印证**(其仓库 `docs/NATIVE_LAYOUTS.md`,§8.1):`hud.xml` 的 QOL 边界 = "HUD script load graph, shared styles and class listeners";`hud_escape_menu.xml` 边界 = "Independent settings script/style context and settings controls"。
-- `hud_escape_menu.xml` 另需 graft:QOL 的窗口面板 + 入口按钮 + `QOLStorageBridge` + 样式 include(参考反编译件 `_reference/hud_escape_menu_qollock.xml`)。
+- `hud_escape_menu.xml` 另需 graft:QOL 的窗口面板 + 入口按钮 + `QOLStorageBridge` + 样式 include(graft 源见下方实配方)。
 - 本 mod 的 XML 内所有插入行都带 `<!-- BabelTower: ... -->` 标记注释,机器可定位。
 - **兼容包只含这 2 个 XML**;双方其余文件从各自 pak 加载(§3.3)。
 
@@ -76,11 +76,29 @@
 3. 以我们的 XML 为基底,插入 QOL 的 include/面板行(避开 `BabelTower:` 标记区)。
 4. 打包为**低槽位** VPK(§4.3),只含两个 XML。
 
+**已落地配方**(`_compat/build_compat.ps1`,2026-11-04 实测通过):
+
+- graft 源 = `_reference/qollock405_hud` / `qollock405_esc`(Source2Viewer 反编译;来源 VPK = QOLLOCK 4.0.5,SHA-256 `547CCEEE8382FF5ECC26CD5D642E647BA2CEF93C233019A8A9B7D0028877DBD7`,钉哈希不钉版本号)。`_reference/` 不入库仅本机;QOL 换版后重反编译同名两个文件即可重跑脚本。
+- `hud.xml` graft 清单(行号 = 反编译件内):qHud 9-10(样式 showrank/qollock_global,插在游戏 `hud.vcss` 之后、本 mod `lct_net` 之前)、qHud 13-92(80 条 HUD 脚本装载图,插在 `<scripts>` 顶部;QOL 块在前、本 mod 2 条在后)。
+- `hud_escape_menu.xml` graft 清单:`ql_settings.vcss_c` 样式(字面插入)、qEsc 9-60(52 条设置装载图,本 mod 3 条在其后)、qEsc 63(EscapeBackground 内联守卫版,整行替换)、qEsc 64-74(SettingsWindow 壳)、qEsc 124-129(ModSettingsBtn 行,插在本 mod 行后)、qEsc 163(QOLStorageBridge,插在根闭标签前)。**405 的 HUD 侧存储桥由 `ql_storage_bridge.js` 运行时创建,XML 无此行、不 graft**。
+- 生成后断言(防静默坏包):hud 含 82 条 `vjs_c` include(80 QOL + 2 本 mod)且 showrank/qollock_global 各 1;esc 含 55 条脚本 include(52 QOL + 3 本 mod)且 `ModSettingsBtn`/`LCTModSettingsBtn`/`SettingsWindow`/`QOLStorageBridge` 各 1、内联守卫含 `&&`。任一不满足即 FAIL——2026-11-04 曾因 graft 单行取值退化(PowerShell 单元素数组展开,`[0]` 取到首字符)静默丢 2 条样式而产物仍合法可编译,断言即为此类错误而设。
+- 产物 `dist/pak03_dir.vpk`(≈20.5 KB,addoninfo + 2 个 `vxml_c`,AddonName=lctcompat)。
+
 ### 4.3 槽位选择
 
 - 合并包编号必须 **< QOL 安装的最低槽**(QOL 历史打包占 pak04–pak92 一串)。
 - 本机 pak01(GB 563116)等已被占用 → **可用区间 pak02–pak03**,以安装当日 `addons/.dmm.json` 登记为准。
 - DMM 的「Load first/排序」本质 = 改名重排 vpk 编号,同样服从低编号规则;手工安装则直接挑空闲低号。
+
+**本机实装(2026-11-04 验证)**:
+
+| 槽位 | 内容 |
+|---|---|
+| `pak03_dir.vpk` | 合并兼容包(2 个超集 XML,20,504 B) |
+| `pak26_dir.vpk` | QOLLOCK 4.0.5 **原包整体改名挪入**(27,945,090 B,其余全部文件从本槽解析;纯改名 `pak03_dir.vpk → pak26_dir.vpk`,零重打包) |
+| `pak91_dir.vpk` | 本 mod 本体(脚本/样式,不动) |
+
+槽位可用性以安装当日 `addons/.dmm.json` + 磁盘双重核实(pak26 当时空闲)。
 
 ---
 
@@ -112,6 +130,8 @@ Select-String -Path "C:\SteamLibrary\steamapps\common\Deadlock\game\citadel\cons
 - 中文日志乱码是控制台代码页表象,不影响匹配。
 - VPK 部署前游戏必须关闭(文件被进程锁定)。
 
+**2026-11-04 实测通过**:合并包(pak03)+ QOL 4.0.5(pak26)+ 本 mod(pak91)同装,同一启动窗口(23:23:43-44)双方签名同现——`[LCT]` 19 行(聊天钩子/出站钩子/协议选举/CEF 面板绑定/配置应用全链路)+ `[QOLLock]` 85 行(StorageBridge 连接、339 键/47 桶)。对照实验:同 QOL 直装 pak03 时 `[LCT]` = 0(§1 输家死法)。用户实机确认可用。
+
 ---
 
 ## 7. 维护(游戏更新后)
@@ -131,3 +151,17 @@ Select-String -Path "C:\SteamLibrary\steamapps\common\Deadlock\game\citadel\cons
 3. **聊天翻译账号门控是官方结论**:`ARCHITECTURE.md` §11 "Chat translation is account-gated" + `docs/features/ql_chat_translation.md` "account-restricted experiment…has no public persisted toggle"。§2 的"对其他用户是死代码"由反编译推断升级为**官方声明**。
 4. **构建工具链相同**:双方都用 Reduced CSDK 12 编译打包,产物形态一致,无额外差异面。
 5. **Apache-2.0**:QOLLOCK 原创部分为 Apache-2.0(Apache-2.0 与 AGPL-3.0 可合并)。合并兼容包含其 XML 片段时,分发须随包保留其 LICENSE/NOTICE 归属信息。
+
+---
+
+## 9. 社区同类方案情报(Hantu-Raya/Deadlock-mods-collection,2026-11-04 核对)
+
+仓库:github.com/Hantu-Raya/Deadlock-mods-collection(约 20 个 mod + 研究/构建工具)。其中 `hp_colors_rewrite_qollock` 系列 = **血条 mod × QOLLOCK 共存**,与本 mod 问题同构,可借鉴点:
+
+1. **处理器包装模式**:`oncancel="if ($.X && $.X()) {} else <原处理>"`——XML 层前缀包装对方已有处理器,先己后人、短路兜底,无装载顺序依赖,比 §5 的"后装载者接管"更确定。本 mod 现方案已实测通过,列为下次大改候选项(不在验证期同时改两个变量)。
+2. **构建合同 + 断言**:`pak02-contract.json`(required/forbidden packed assets,禁源码形态与文档进包)+ `requireMatchCount` 断言 → 已吸收进 §4.2 生成后断言。
+3. **源钉扎**:`qollock-source.sha256` / `thirdeye-source-pin.json`(包哈希 + 逐文件快照哈希 + required assets 清单)→ 已吸收(§4.2 记录 graft 源 VPK SHA-256)。
+4. **其方案不碰 `hud.xml`**("leaves QOLLOCK's own hud.xml in charge")——因其无 HUD context 脚本需求;本 mod 必须争两个文件,超集方案无更轻路线(侧面印证)。
+5. **SubOptions 上溢**:原生 SubOptions 底部锚定、每行向上长 32px,加行会顶进主按钮区;其解法 = 原生按钮 `margin-bottom` 抬升。本合并包净增 2 行(+64px),2026-11-04 实测未见异常,留观。
+6. **CitadelHTMLPanel 二进制研究**(IDA + 字符串清单 + 重启实机实验):V8 层仅 `SetURL`/`SetIgnoreCursor`;页面→Panorama 唯一实证数据通道 = `document.title` → `HTMLTitle` 事件;`HTMLContentLoaded` 在**菜单 context** 注册抛异常(须守卫;本 mod 在 HUD context 实测绑定成功,§6——事件可用性与 context 相关);无 DOM/响应体读回、无 console 转发。作为 LCTNet 的能力边界地图。
+7. 其钉扎的 QOLLOCK 为 "4.0.5 6 October hotfix",与本机 10-16 打包件非同一 zip——"钉哈希不钉版本号"的必要性实例。
