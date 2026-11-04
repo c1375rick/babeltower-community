@@ -53,7 +53,11 @@
 	const OWN_PANEL_CLASS = "SenderLocalClient";
 	// 译文标签标记类:chat 树没有我们的 CSS(样式走内联),此类只作 resetRowModState 的识别标记
 	const TRANS_CLASS = "LCTTranslation";
-	const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff]/;
+	const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff]/; // 汉字(中日共用,日文靠假名信号区分)
+	const RE_KANA = /[\u3040-\u30ff]/;             // 假名 —— 日文铁证(中文没有假名)
+	const RE_HANGUL = /[\uac00-\ud7af]/;           // 谚文 —— 韩文
+	const RE_CYRILLIC = /[\u0400-\u04ff]/;         // 西里尔 —— 俄文
+	const RE_LATIN_ACCENT = /[\u00c0-\u00ff]/;     // 变音拉丁(é ñ ü...)—— 法/德/西信号
 
 	/* ---------- 基础工具 ---------- */
 
@@ -209,12 +213,34 @@
 	function isTargetLanguageText(text) {
 		const t = targetLanguage().toLowerCase();
 		const s = String(text || "");
+		// 通用规则(用户要求举一反三):含"目标文字系统"信号且不含任何其它文字系统信号
+		// → 已达标跳过;纯外文或混合(目标文+外文)一律送翻 —— 与整句翻译策略一致。
 		if (t.indexOf("zh") === 0) {
-			// 中文目标:纯中文(含汉字且无拉丁字母)才跳过;英/日/韩/俄等一律送翻
-			return CJK_RE.test(s) && !/[A-Za-z]/.test(s);
+			// 中文:汉字在,假名/谚文/西里尔/拉丁都不在
+			return CJK_RE.test(s) && !RE_KANA.test(s) && !RE_HANGUL.test(s) &&
+				!RE_CYRILLIC.test(s) && !/[A-Za-z]/.test(s);
 		}
-		// 非中文目标(典型 en,用户明确要求):字母全部为 ASCII latin(英文)才跳过;
-		// 中文/日文/韩文/西里尔等其它文字系统一律送翻(表情/数字/标点不参与判定)
+		if (t.indexOf("ja") === 0) {
+			// 日文:假名在(纯汉字无假名 = 中文,送翻),拉丁/谚文/西里尔不在
+			return RE_KANA.test(s) && !/[A-Za-z]/.test(s) && !RE_HANGUL.test(s) && !RE_CYRILLIC.test(s);
+		}
+		if (t.indexOf("ko") === 0) {
+			// 韩文:谚文在,假名/拉丁/西里尔/汉字都不在
+			return RE_HANGUL.test(s) && !RE_KANA.test(s) && !/[A-Za-z]/.test(s) &&
+				!RE_CYRILLIC.test(s) && !CJK_RE.test(s);
+		}
+		if (t.indexOf("ru") === 0) {
+			// 俄文:西里尔在,拉丁/汉字/假名/谚文都不在
+			return RE_CYRILLIC.test(s) && !/[A-Za-z]/.test(s) && !CJK_RE.test(s) &&
+				!RE_KANA.test(s) && !RE_HANGUL.test(s);
+		}
+		if (t === "fr" || t === "de" || t === "es") {
+			// 法/德/西与英文共享拉丁字母表,文字系统不可分:只跳过"带变音符号的纯欧文";
+			// 英文与无变音欧文照送翻(宁可重翻,不可漏翻)
+			return RE_LATIN_ACCENT.test(s) && !/[A-Za-z]/.test(s) && !CJK_RE.test(s) &&
+				!RE_KANA.test(s) && !RE_HANGUL.test(s) && !RE_CYRILLIC.test(s);
+		}
+		// 缺省(en 及未知码):字母全部 ASCII → 已达标;任何非 ASCII 字母(汉字/假名/谚文/西里尔/变音)→ 送翻
 		const letters = s.replace(/\P{L}/gu, "");
 		return letters.length > 0 && !/[^\x00-\x7F]/.test(letters);
 	}
