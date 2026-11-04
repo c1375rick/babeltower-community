@@ -245,6 +245,24 @@
 		return letters.length > 0 && !/[^\x00-\x7F]/.test(letters);
 	}
 
+	// 探测源语言码(仅对"纯单文字系统"文本给明确值;混合/变音/无字母 → auto)。
+	// 为什么要报明来源:桥的 mymemory 兜底不支持 auto,页面会静默当 en
+	// (app index.html trMm: source!=="auto" ? source : "en"),韩/日/俄文被塞进
+	// en|x 语言对 → MyMemory 翻不动 → 原样回显(2026-11-04 实测 안녕/こんにちは 原样弹回)。
+	// 纯度条件与 isTargetLanguageText 的分支一一对应。
+	function detectSourceCode(s) {
+		if (RE_KANA.test(s) && !/[A-Za-z]/.test(s) && !RE_HANGUL.test(s) && !RE_CYRILLIC.test(s)) return "ja";
+		if (RE_HANGUL.test(s) && !RE_KANA.test(s) && !/[A-Za-z]/.test(s) &&
+			!RE_CYRILLIC.test(s) && !CJK_RE.test(s)) return "ko";
+		if (RE_CYRILLIC.test(s) && !/[A-Za-z]/.test(s) && !CJK_RE.test(s) &&
+			!RE_KANA.test(s) && !RE_HANGUL.test(s)) return "ru";
+		if (CJK_RE.test(s) && !RE_KANA.test(s) && !RE_HANGUL.test(s) &&
+			!RE_CYRILLIC.test(s) && !/[A-Za-z]/.test(s)) return "zh-CN";
+		const letters = s.replace(/\P{L}/gu, "");
+		if (letters.length > 0 && !/[^\x00-\x7F]/.test(letters)) return "en";
+		return "auto";
+	}
+
 	/* ---------- 跳过判定(v2 收敛版) ---------- */
 
 	function shouldSkip(record) {
@@ -457,7 +475,7 @@
 		try {
 			bridge.translate(
 				[{ i: 0, t: job.text }],
-				{ target: targetLanguage(), source: "auto", mode: "incoming" },
+				{ target: targetLanguage(), source: detectSourceCode(job.text), mode: "incoming" },
 				function (res) {
 					if (State.active !== job) return; // 迟到回调(看门狗已接管)
 					State.active = null;
