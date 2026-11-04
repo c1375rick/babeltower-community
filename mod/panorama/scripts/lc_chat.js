@@ -16,6 +16,7 @@
 	 *     跨 context 注入 Label 是 v2 生产实证形态(chat context 注入 HUD 顶栏行)。
 	 *
 	 * 与 v2 的刻意差异(后续阶段补齐):
+	 *   - 混合消息不做片段拆分,整句送翻(用户决策:模组从简)
 	 *   - 无 quickchat 模板库 → Ping 行只在"已是目标语言"时跳过(v2 2026-10-28 收紧逻辑的可行子集)
 	 *   - 无专名保护/出站翻译/游戏名占位
 	 *
@@ -214,40 +215,6 @@
 		return false;
 	}
 
-	/* ---------- 混合片段(v2 移植:中文客户端收到"我看到 McGinnis"类消息) ---------- */
-
-	function leftoverEnglish(text) {
-		let s = String(text || "");
-		s = s.replace(/[\u3400-\u4dbf\u4e00-\u9fff]+/g, " ");
-		s = s.replace(/[\d\s\W_]+/g, " ");
-		return s.trim();
-	}
-
-	function mixedFragment(text) {
-		const s = String(text || "");
-		if (!CJK_RE.test(s)) return null; // 没有中文 → 整句翻译
-		return leftoverEnglish(s);
-	}
-
-	function assembleMixedTranslation(originalText, fragmentTranslation) {
-		const frag = String(fragmentTranslation || "").trim();
-		const orig = String(originalText || "");
-		if (!frag) return orig;
-		const segs = orig.split(/([\u3400-\u4dbf\u4e00-\u9fff]+)/); // 偶数下标=非中文段,奇数=中文段
-		let latinCount = 0;
-		let lastLatin = -1;
-		for (let i = 0; i < segs.length; i += 2) {
-			if (segs[i] && /[A-Za-z]/.test(segs[i])) { latinCount += 1; lastLatin = i; }
-		}
-		if (latinCount === 1) {
-			segs[lastLatin] = " " + frag + " ";
-			return segs.join("").replace(/\s+/g, " ").trim();
-		}
-		let chinese = "";
-		for (let i = 1; i < segs.length; i += 2) chinese += segs[i];
-		return (chinese + " " + frag).replace(/\s+/g, " ").trim();
-	}
-
 	/* ---------- 跳过判定(v2 收敛版) ---------- */
 
 	function shouldSkip(record) {
@@ -321,15 +288,15 @@
 		}
 	}
 
-	function injectTranslation(row, sig, displayText, mixed) {
+	function injectTranslation(row, sig, displayText) {
 		if (!isValid(row)) return;
 		if (!displayText) return;
 		const label = ensureLabel(row, sig);
 		if (!label) return;
 		try { label.RemoveClass("LCTTranslationError"); } catch (e) {}
 		try { label.text = String(displayText); } catch (e) {}
-		// 只显示译文模式:隐藏原文。混合消息/Ping 行不折叠(折叠会让内容消失)
-		if (!mixed && String(cfg().displayMode) === "translation_only" && !rowIsPing(row)) {
+		// 只显示译文模式:隐藏原文(Ping 行不折叠:折叠会让快捷短语内容消失)
+		if (String(cfg().displayMode) === "translation_only" && !rowIsPing(row)) {
 			const contents = findChild(row, MESSAGE_CONTENTS_ID);
 			if (contents) {
 				try { contents.style.visibility = "collapse"; } catch (e) {}
@@ -403,21 +370,20 @@
 		const cached = State.cache.get(textKeyOf(translating));
 		if (!cached) return false;
 		if (getTransLabel(row, sig)) return true;
-		injectTranslation(row, sig, cached.display, !!cached.mixed);
+		injectTranslation(row, sig, cached);
 		return true;
 	}
 
 	function deliver(group, translation) {
 		if (!group) return;
-		// 缓存与注入统一在"最终显示文本"上完成(混合消息在此拼装)
-		const display = group.mixed ? assembleMixedTranslation(group.orig, translation) : String(translation || "");
-		State.cache.set(group.key, { display: display, mixed: !!group.mixed });
+		const display = String(translation || "").trim();
+		State.cache.set(group.key, display);
 		trimCache();
 		State.inflight.delete(group.key);
 		for (let i = 0; i < group.rows.length; i += 1) {
 			const entry = group.rows[i];
 			if (isValid(entry.row) && entry.row.__lctSig === entry.sig) {
-				injectTranslation(entry.row, entry.sig, display, !!group.mixed);
+				injectTranslation(entry.row, entry.sig, display);
 			}
 			// 行已失效(游戏回收/清理)→ 丢弃;同文新行会经缓存路径恢复
 		}
@@ -497,18 +463,17 @@
 		}
 	}
 
-	function enqueue(row, sig, record, mixedFrag) {
-		const translating = mixedFrag === null ? record.text : mixedFrag;
-		const key = textKeyOf(translating);
+	function enqueue(row, sig, record) {
+		const key = textKeyOf(record.text);
 		// in-flight 合并:同 textKey 只发一次桥请求,结果扇出注入所有同文行
 		const existing = State.inflight.get(key);
 		if (existing) {
 			existing.rows.push({ row: row, sig: sig });
 			return;
 		}
-		const group = { key: key, rows: [{ row: row, sig: sig }], orig: record.text, mixed: mixedFrag !== null };
+		const group = { key: key, rows: [{ row: row, sig: sig }] };
 		State.inflight.set(key, group);
-		State.queue.push({ text: translating, group: group, attempts: 0 });
+		State.queue.push({ text: record.text, group: group, attempts: 0 });
 		while (State.queue.length > QUEUE_MAX) State.queue.shift(); // 溢出丢最老
 		pumpQueue();
 	}
@@ -559,17 +524,13 @@
 			row.__lctWatched = false;
 			try { State.pendingFill.delete(row); } catch (e) {}
 		}
-		let skip = shouldSkip(record);
-		// 混合消息:只把非中文片段送去翻译,中文部分原样保留(record.text 保持完整原文,签名稳定)
-		const mixedFrag = skip ? null : mixedFragment(record.text);
-		if (mixedFrag !== null && !mixedFrag) skip = true; // force 下纯中文兜底:无片段可译
-		const translating = mixedFrag === null ? record.text : mixedFrag;
+		const skip = shouldSkip(record);
 		const sig = makeSignature(record);
 
 		// 已处理过的行:签名变化 = 被回收复用 → 重置处理状态
 		const prevSig = row.__lctSig;
 		if (row.__lctProcessed && prevSig === sig) {
-			if (!skip) restoreFromCache(row, sig, translating);
+			if (!skip) restoreFromCache(row, sig, record.text);
 			return false;
 		}
 		if (prevSig !== sig) {
@@ -580,7 +541,7 @@
 		row.__lctProcessed = true;
 
 		if (State.seen.has(sig)) {
-			if (!skip) restoreFromCache(row, sig, translating);
+			if (!skip) restoreFromCache(row, sig, record.text);
 			return false;
 		}
 		State.seen.add(sig);
@@ -588,12 +549,12 @@
 
 		if (skip) return false;
 		State.nNew += 1;
-		const cached = State.cache.get(textKeyOf(translating));
+		const cached = State.cache.get(textKeyOf(record.text));
 		if (cached) {
-			injectTranslation(row, sig, cached.display, !!cached.mixed);
+			injectTranslation(row, sig, cached);
 			return false;
 		}
-		enqueue(row, sig, record, mixedFrag);
+		enqueue(row, sig, record);
 		return true;
 	}
 
@@ -693,7 +654,7 @@
 		scannedCount: 0,
 		bootLogged: false,
 		seen: new Set(),       // 已处理签名(行级去重)
-		cache: new Map(),      // textKey -> {display, mixed}
+		cache: new Map(),      // textKey -> 译文显示文本
 		inflight: new Map(),   // textKey -> group(同文合并)
 		pendingFill: new Map(),// row -> 观察截止时间(空行文本延迟填充)
 		queue: [],             // 待翻译任务
