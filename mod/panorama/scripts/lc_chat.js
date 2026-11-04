@@ -14,6 +14,8 @@
 	 *       自己的消息:行内 .SenderLocalClient 面板(v2 另判 IsSelf 类,双判保留)
 	 *   - 钩子跑在 hud.xml context(chat.xml 是自定义面板实例、其布局脚本不执行——信标实证);
 	 *     跨 context 注入 Label 是 v2 生产实证形态(chat context 注入 HUD 顶栏行)。
+ *   - 扫描两处:聊天窗口 #ChatMessages + HUD 顶栏 Team1Chat/Team2Chat 的 #Messages
+ *     (对局中不开聊天框也能看到译文;行解剖 2026-11-04 反编译实证,见 HUD_CHAT_IDS 注释)
 	 *
 	 * 与 v2 的刻意差异(后续阶段补齐):
 	 *   - 混合消息不做片段拆分,整句送翻(用户决策:模组从简)
@@ -64,6 +66,17 @@
 	const CHANNEL_NAME_CLASS = "ChannelName";
 	const OWN_PANEL_CLASS = "SenderLocalClient";
 	const CHAT_INPUT_ID = "ChatInput";       // 游戏 chat.xml TextEntry(跨 context 面板访问,v3 收消息已实证)
+	// HUD 顶栏聊天(不开聊天框时对局里飘的气泡):游戏内置布局 citadel_hud_top_bar_chat,
+	// Team1Chat/Team2Chat 两实例(当前游戏 citadel_hud_top_bar.vxml 实证,挂 CitadelHudTopBar 内),
+	// 消息容器 #Messages,行 = snippet ChatMessage。行解剖与聊天窗口不同(2026-11-04 反编译实证):
+	//   .ChatMessage > #ChatArrow + #MessageContents > .ChatBubble > .TextContainer >
+	//   .MessageWrapper > #MessageText(html="true");无 .MessageBody/.SenderName;
+	//   轮盘行标记 = #PingStyleIcon(+SubjectIcon/CooldownTimer/ResponseHeroes),非 Ping/PingLabel;
+	//   另有 TypingIndicatorChatMessage snippet(#TypingAnim,无文本,自然落空行观察表后过期)。
+	const HUD_CHAT_IDS = ["Team1Chat", "Team2Chat"];
+	const HUD_MESSAGES_ID = "Messages";
+	const HUD_BUBBLE_CLASS = "ChatBubble";   // 行判别:有 ChatBubble = HUD 行(聊天窗口行没有)
+	const HUD_TEXT_ID = "MessageText";
 	// 译文标签标记类:chat 树没有我们的 CSS(样式走内联),此类只作 resetRowModState 的识别标记
 	const TRANS_CLASS = "LCTTranslation";
 	const OUT_WATCHDOG = 3.0;      // 出站等翻译预算(秒):超时原文照发,聊天不能等协议 8s+重试
@@ -203,6 +216,21 @@
 
 	function readMessageRow(row) {
 		// DOM 每扫必读(v2 教训:面板缓存曾让回收行永远命中旧 record,行冻结)
+		// HUD 顶栏行判别:.ChatMessage 包裹 + .ChatBubble 在场(聊天窗口行无 ChatBubble)。
+		// 文本在 #MessageText;无 MessageSource(发送者名不进签名,channel="hud" 已足够区分)。
+		if (hasClass(row, "ChatMessage") && findClass(row, HUD_BUBBLE_CLASS)) {
+			const text = safeText(findChild(row, HUD_TEXT_ID)) || collectText(row);
+			if (!text) return null;
+			return {
+				sender: "", channel: "hud", text: text,
+				isOwn: hasClass(row, "IsSelf"),
+				// 轮盘/快捷行结构标记(游戏本地化已渲染,翻译只是劣质重复):
+				// PingStyleIcon 是 HUD 侧铁标(v2 2026-10-02 实车教训:漏掉它轮盘消息全被重翻)
+				quick: hasClass(row, "Ping") || !!findChild(row, "PingLabel") ||
+					!!findChild(row, "PingStyleIcon") || !!findChild(row, "SubjectIcon") ||
+					!!findChild(row, "CooldownTimer") || !!findChild(row, "ResponseHeroes")
+			};
+		}
 		const source = findChild(row, MESSAGE_SOURCE_ID);
 		const contents = findChild(row, MESSAGE_CONTENTS_ID);
 		if (!contents) return null; // 气泡先建、内容未填 → 观察表等补扫
@@ -306,7 +334,13 @@
 	}
 
 	function labelHost(row) {
-		// 当前游戏行:.MessageBody(flow-children down,译文落在气泡下方)
+		// 聊天窗口行:.MessageBody(flow-children down,译文落在气泡下方);
+		// HUD 顶栏行:#MessageContents(游戏 CSS flow-down,译文在气泡正下方;
+		//   直接挂 ChatBubble 会进横向流,译文被挤到气泡右侧 —— v2 实证)
+		if (findClass(row, HUD_BUBBLE_CLASS)) {
+			const hudContents = findChild(row, MESSAGE_CONTENTS_ID);
+			if (hudContents) return hudContents;
+		}
 		return findClass(row, MESSAGE_BODY_CLASS) || row;
 	}
 
@@ -358,10 +392,15 @@
 		if (!label) return;
 		try { label.RemoveClass("LCTTranslationError"); } catch (e) {}
 		try { label.text = String(displayText); } catch (e) {}
-		// 只显示译文模式:隐藏原文(Ping 行不折叠:折叠会让快捷短语内容消失)
+		// 只显示译文模式:隐藏原文(Ping 行不折叠:折叠会让快捷短语内容消失)。
+		// HUD 行特例:译文标签就挂在 #MessageContents 下,折叠 contents 会连译文一起藏掉
+		// → 折 .ChatBubble(原文气泡)而非 contents
 		if (String(cfg().displayMode) === "translation_only" && !rowIsPing(row)) {
-			const contents = findChild(row, MESSAGE_CONTENTS_ID);
-			if (contents) {
+			const bubble = findClass(row, HUD_BUBBLE_CLASS);
+			const contents = bubble ? null : findChild(row, MESSAGE_CONTENTS_ID);
+			if (bubble) {
+				try { bubble.style.visibility = "collapse"; } catch (e) {}
+			} else if (contents) {
 				try { contents.style.visibility = "collapse"; } catch (e) {}
 			}
 		}
@@ -383,6 +422,10 @@
 		try {
 			const contents = findChild(row, MESSAGE_CONTENTS_ID);
 			if (contents && contents.style) contents.style.visibility = "visible";
+		} catch (e) {}
+		try {
+			const bubble = findClass(row, HUD_BUBBLE_CLASS); // HUD 行折叠的是气泡(见 injectTranslation)
+			if (bubble && bubble.style) bubble.style.visibility = "visible";
 		} catch (e) {}
 		const containers = [];
 		const body = findClass(row, MESSAGE_BODY_CLASS);
@@ -638,6 +681,57 @@
 		return touched;
 	}
 
+	/* ---------- HUD 顶栏聊天扫描(只扫不改布局,零漂移) ---------- */
+
+	function resolveHudMessages() {
+		const root = getRoot();
+		if (!root) return;
+		const found = [];
+		for (let i = 0; i < HUD_CHAT_IDS.length; i += 1) {
+			// 主路径:布局写死的固定 id(当前游戏 citadel_hud_top_bar.vxml 实证)
+			const chat = findChild(root, HUD_CHAT_IDS[i]);
+			const messages = chat ? findChild(chat, HUD_MESSAGES_ID) : null;
+			if (isValid(messages)) found.push(messages);
+		}
+		let changed = found.length !== State.hudMessages.length;
+		if (!changed) {
+			for (let i = 0; i < found.length; i += 1) {
+				if (found[i] !== State.hudMessages[i]) { changed = true; break; }
+			}
+		}
+		if (changed) {
+			// 面板树变化(进对局 0→2 / 结束 2→0)→ 水位线重建;日志能看到发现时机
+			State.hudMessages = found;
+			State.hudScanned = [];
+			for (let i = 0; i < found.length; i += 1) State.hudScanned.push(0);
+			log("watching HUD top bar chat (" + found.length + ")");
+		}
+	}
+
+	function scanHudTopBarOnce() {
+		resolveHudMessages();
+		let touched = false;
+		for (let i = 0; i < State.hudMessages.length; i += 1) {
+			const messages = State.hudMessages[i];
+			if (!isValid(messages)) continue;
+			try {
+				const count = childCount(messages);
+				const scanned = State.hudScanned[i] || 0;
+				if (count < scanned) State.hudScanned[i] = 0; // 容器清空/重建
+				let start = State.hudScanned[i] || 0;
+				if (start === 0 && count > BOOTSTRAP_TAIL) start = count - BOOTSTRAP_TAIL; // 首扫只扫尾部,不翻历史
+				touched = processRange(messages, start, count) || touched;
+				// 低延迟:尾部补扫(气泡文本延迟填充)
+				touched = processRange(messages, Math.max(0, count - TAIL_RESCAN), count) || touched;
+				State.hudScanned[i] = count;
+			} catch (e) {
+				// 单容器异常不中断整体(顶栏翻译不因个别面板异常停摆)
+				log("hud scan container " + i + " error: " + expErr(e));
+			}
+		}
+		return touched;
+	}
+
 	function scanOnce() {
 		const messages = resolveMessages();
 		if (!messages) {
@@ -657,6 +751,9 @@
 		// 低延迟:每次额外扫末尾几条(发送者名/内容可能延迟填充)
 		touched = processRange(messages, Math.max(0, count - TAIL_RESCAN), count) || touched;
 		touched = processPendingFill() || touched;
+		try { touched = scanHudTopBarOnce() || touched; } catch (eH) {
+			log("hud scan error: " + expErr(eH));
+		}
 		return touched;
 	}
 
@@ -849,6 +946,8 @@
 		pendingFill: new Map(),// row -> 观察截止时间(空行文本延迟填充)
 		queue: [],             // 待翻译任务
 		active: null,          // 在飞任务(单槽)
+		hudMessages: [],       // HUD 顶栏聊天 #Messages 容器列表(Team1Chat/Team2Chat)
+		hudScanned: [],        // 每容器水位线(与 hudMessages 同步重建)
 		outPending: null,      // 出站:翻译中的原文(去重 + 看门狗判定)
 		outSeq: 0,             // 出站提交序号:看门狗放行/新提交后,迟到回调作废
 		outInput: null,        // 已挂钩的 ChatInput 面板(UI 重建 → 重挂)
