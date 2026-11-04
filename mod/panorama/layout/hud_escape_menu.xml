@@ -13,6 +13,9 @@
        同 QOLLOCK 的 SettingsWindow/SettingsBody/SettingsList 三层 hittest="true";
        内容 = 原 lct_settings_tab.xml 的行,onactivate 一律走 $.X 守卫形式;
        面板可见性由 .LCTOpen 类驱动)
+    6. 本地化:静态文案标签带 LCTTxt* id(lct_settings_ui.js 的 applyTexts 按当前
+       界面语言 zh/en 重填,数据在 lct_i18n.js);新增"界面语言"选择行(uiLang)。
+       lct_i18n.vjs_c 必须在 lct_settings_ui.vjs_c **之前** include(装载顺序契约)。
   全程零 BLoadLayout、零运行时跨 context 注入(QOLLOCK 反编译实证:BLoadLayout 出现 0 次)。
 -->
 <root>
@@ -23,6 +26,7 @@
 		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
+		<include src="s2r://panorama/scripts/lct_i18n.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
 		<!-- lc_protocol 不在此引入:协议单实例运行于 hud.xml(对局常驻可见 context)。
@@ -38,7 +42,7 @@
 		-->
 		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true" onactivate="">
 			<Panel class="LCTHeader">
-				<Label class="LCTHeaderText" text="BABELTOWER 翻译" />
+				<Label id="LCTTxtTitle" class="LCTHeaderText" text="BABELTOWER 翻译" />
 				<Panel class="LCTHeaderSpacer" />
 				<Label id="LCTBuildId" class="LCTBuildId" text="" />
 				<Button id="LCTSettingsClose" class="LCTCloseBtn" onactivate="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); }">
@@ -49,8 +53,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="启用翻译" />
-							<Label class="LCTRowHint" text="关闭后所有消息保留原文" />
+							<Label id="LCTTxtRowEnabled" class="LCTRowLabel" text="启用翻译" />
+							<Label id="LCTTxtHintEnabled" class="LCTRowHint" text="关闭后所有消息保留原文" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTTglEnabled" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('enabled'); }">
@@ -63,8 +67,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="目标语言" />
-							<Label class="LCTRowHint" text="把别人的消息翻译成这个语言" />
+							<Label id="LCTTxtRowTarget" class="LCTRowLabel" text="目标语言" />
+							<Label id="LCTTxtHintTarget" class="LCTRowHint" text="把别人的消息翻译成这个语言" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTSelTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('targetLanguage'); }">
@@ -88,8 +92,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="显示模式" />
-							<Label class="LCTRowHint" text="译文下方是否保留原文" />
+							<Label id="LCTTxtRowDisplay" class="LCTRowLabel" text="显示模式" />
+							<Label id="LCTTxtHintDisplay" class="LCTRowHint" text="译文下方是否保留原文" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTSelDisplay" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('displayMode'); }">
@@ -107,8 +111,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="发送前翻译" />
-							<Label class="LCTRowHint" text="把自己打的消息先翻成目标语言再发出" />
+							<Label id="LCTTxtRowOutgoing" class="LCTRowLabel" text="发送前翻译" />
+							<Label id="LCTTxtHintOutgoing" class="LCTRowHint" text="把自己打的消息先翻成目标语言再发出" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTSelOutgoing" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoing'); }">
@@ -127,7 +131,7 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="发送目标语言" />
+							<Label id="LCTTxtRowOutTarget" class="LCTRowLabel" text="发送目标语言" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTSelOutTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoingTarget'); }">
@@ -148,8 +152,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="强制翻译" />
-							<Label class="LCTRowHint" text="跳过语言判断,一律翻译" />
+							<Label id="LCTTxtRowForce" class="LCTRowLabel" text="强制翻译" />
+							<Label id="LCTTxtHintForce" class="LCTRowHint" text="跳过语言判断,一律翻译" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTTglForce" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('force'); }">
@@ -162,8 +166,8 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="翻译自己的消息" />
-							<Label class="LCTRowHint" text="自己发出的消息也显示译文" />
+							<Label id="LCTTxtRowTranslateOwn" class="LCTRowLabel" text="翻译自己的消息" />
+							<Label id="LCTTxtHintTranslateOwn" class="LCTRowHint" text="自己发出的消息也显示译文" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTTglTranslateOwn" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('translateOwn'); }">
@@ -176,7 +180,7 @@
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
-							<Label class="LCTRowLabel" text="翻译超时" />
+							<Label id="LCTTxtRowTimeout" class="LCTRowLabel" text="翻译超时" />
 						</Panel>
 						<Panel class="LCTRight">
 							<Button id="LCTSelTimeout" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('timeoutMs'); }">
@@ -190,6 +194,24 @@
 						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','8000','8 秒'); }"><Label class="LCTMenuOptionLabel" text="8 秒" /></Button>
 						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','12000','12 秒'); }"><Label class="LCTMenuOptionLabel" text="12 秒" /></Button>
 						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','16000','16 秒'); }"><Label class="LCTMenuOptionLabel" text="16 秒" /></Button>
+					</Panel>
+				</Panel>
+
+				<Panel class="LCTRow">
+					<Panel class="LCTLine">
+						<Panel class="LCTRowBody">
+							<Label id="LCTTxtRowUiLang" class="LCTRowLabel" text="界面语言" />
+						</Panel>
+						<Panel class="LCTRight">
+							<Button id="LCTSelUiLang" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('uiLang'); }">
+								<Label id="LCTSelUiLangLabel" class="LCTSelectLabel" text="中文" />
+								<Label class="LCTSelectArrow" text="▼" />
+							</Button>
+						</Panel>
+					</Panel>
+					<Panel id="LCTMenuUiLang" class="LCTMenu">
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('uiLang','zh','中文'); }"><Label class="LCTMenuOptionLabel" text="中文" /></Button>
+						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('uiLang','en','English'); }"><Label class="LCTMenuOptionLabel" text="English" /></Button>
 					</Panel>
 				</Panel>
 
@@ -241,7 +263,7 @@
 					</Panel>
 					<Panel class="SettingsRow">
 						<Button id="LCTModSettingsBtn" class="nav_menu_item minor" onactivate="if ($.LCTToggleSettingsWindow) { $.LCTToggleSettingsWindow(); }">
-							<Label text="BabelTower 翻译" class="menuButtonLabel" />
+							<Label id="LCTTxtMenuEntry" text="BabelTower 翻译" class="menuButtonLabel" />
 							<Image id="LCTSettingsGearIcon" class="smallIcon" src="s2r://panorama/images/icons/icon_gear.vsvg" />
 						</Button>
 					</Panel>

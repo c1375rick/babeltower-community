@@ -55,8 +55,9 @@ GitHub Pages 上的静态桥页面完成。
 | `mod/panorama/layout/hud_escape_menu.xml` | escape | 游戏 `hud_escape_menu.vxml_c` 反编译底稿 + 设置窗口壳(静态声明) + 菜单入口按钮 |
 | `mod/panorama/scripts/lc_protocol.js` | hud | 协议客户端：面板创建、SetURL/HTMLTitle 分片、hello/tr/store 超时状态机、选举、cfg 落盘、对外 `globalThis.LCTBridge` |
 | `mod/panorama/scripts/lc_chat.js` | hud | 消息钩子：聊天窗扫描 + HUD 顶栏扫描 + 出站翻译（详见 §4） |
+| `mod/panorama/scripts/lct_i18n.js` | escape | 界面文案表(zh/en)：无声明全局 `LCT_TEXT_I18N`/`LCT_STATUS_PREFIX`，纯数据零逻辑；必须先于 `lct_settings_ui.vjs_c` include（v2 `lingua_chat_i18n.js` 同法） |
 | `mod/panorama/scripts/lct_settings.js` | escape | 窗口宿主：开/关、Esc 兜底、背景点击（QOLLOCK 生产模式，XML oncancel 不可靠的实证见文件头） |
-| `mod/panorama/scripts/lct_settings_ui.js` | escape | 控件逻辑：读 `lct_cfg` 渲染、写回共享属性、下拉菜单、页脚状态灯 |
+| `mod/panorama/scripts/lct_settings_ui.js` | escape | 控件逻辑：读 `lct_cfg` 渲染、写回共享属性、下拉菜单、页脚状态灯；界面语言 `uiLang`(zh/en, 手选无自动探测)经双向查表填充全部静态文案/选项/状态文本 |
 | `mod/panorama/styles/lct_settings.css` | escape | 设置窗口样式（必须与 UI 同 context include 才生效） |
 | `mod/panorama/styles/lct_net.css` | hud | LCTNet 隐藏面板：`opacity:0.01` + `visibility:visible`（CEF 会暂停不可见面板的定时器） |
 | `app/d2a3dde88d180e5b/index.html` | CEF | 桥页面：协议实现 + 翻译上游 + store；CSP 仅本源 + 两个免 Key 上游；不写 console；localStorage 仅收 `lct:` 前缀键 |

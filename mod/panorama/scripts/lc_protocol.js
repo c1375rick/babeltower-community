@@ -98,6 +98,8 @@
 		outgoingTarget: "en",
 		force: false,
 		translateOwn: true,
+		// 设置面板界面语言(zh/en):纯 UI 设置,协议不消费,随配置持久化/回流
+		uiLang: "zh",
 		timeoutMs: 8000,
 		order: ["edge", "mymemory"]
 	};

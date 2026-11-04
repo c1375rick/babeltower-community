@@ -13,6 +13,9 @@
 	 * 窗口壳/控件面板由 hud_escape_menu.xml 静态声明;XML 的 onactivate 通过 $.LCTUI* 调用
 	 * 本文件导出的函数(同时挂 $ 与 globalThis,QOLLOCK 同款 $.X 暴露形式)。
 	 *
+	 * 依赖 lct_i18n.js:无声明全局 LCT_TEXT_I18N / LCT_STATUS_PREFIX(纯数据表,
+	 * 必须先于本文件加载 —— XML include 顺序契约,与 v2 lingua_chat_i18n.js 同法)。
+	 *
 	 * 注意:本文件严禁定义名为 `$` 的局部函数/变量 —— 会遮蔽 Panorama 全局 `$` 对象,
 	 * 导致 $.Msg/$.Schedule/$.GetContextPanel 全部失效(审查发现的首发缺陷)。
 	 */
@@ -33,6 +36,7 @@
 		outgoingTarget: "en",
 		force: false,
 		translateOwn: true,
+		uiLang: "zh",
 		timeoutMs: 8000,
 		order: ["edge", "mymemory"]
 	};
@@ -115,17 +119,112 @@
 		"displayMode":    { label: "LCTSelDisplayLabel", btn: "LCTSelDisplay", menu: "LCTMenuDisplay" },
 		"outgoing":       { label: "LCTSelOutgoingLabel", btn: "LCTSelOutgoing", menu: "LCTMenuOutgoing" },
 		"outgoingTarget": { label: "LCTSelOutTargetLabel", btn: "LCTSelOutTarget", menu: "LCTMenuOutTarget" },
-		"timeoutMs":      { label: "LCTSelTimeoutLabel", btn: "LCTSelTimeout", menu: "LCTMenuTimeout" }
+		"timeoutMs":      { label: "LCTSelTimeoutLabel", btn: "LCTSelTimeout", menu: "LCTMenuTimeout" },
+		"uiLang":         { label: "LCTSelUiLangLabel", btn: "LCTSelUiLang", menu: "LCTMenuUiLang" }
 	};
 
-	// value -> 显示文本(渲染当前值用)
+	// value -> 显示文本(渲染当前值用)。zh 字面量是源语言:经 localizeText 查
+	// LCT_TEXT_I18N 表得到当前界面语言的文本;markSelected 用同一函数解析,
+	// 保证选中高亮的前缀匹配与显示文本一致。
 	const LABELS = {
 		"targetLanguage": { "zh-Hans": "简体中文", "zh-Hant": "繁體中文", "en": "English", "ja": "日本語", "ko": "한국어", "fr": "Français", "de": "Deutsch", "es": "Español" },
 		"displayMode": { "bilingual": "双语", "translation_only": "仅译文" },
 		"outgoing": { "off": "关", "translation": "仅译文", "bilingual": "双语" },
 		"outgoingTarget": { "en": "English", "zh-Hans": "简体中文", "zh-Hant": "繁體中文", "ja": "日本語", "ko": "한국어" },
-		"timeoutMs": { "4000": "4 秒", "8000": "8 秒", "12000": "12 秒", "16000": "16 秒" }
+		"timeoutMs": { "4000": "4 秒", "8000": "8 秒", "12000": "12 秒", "16000": "16 秒" },
+		"uiLang": { "zh": "中文", "en": "English" }
 	};
+
+	/* ---------- 界面本地化(zh/en;数据表在 lct_i18n.js,先于本文件加载) ---------- */
+
+	// uiLang 是纯 UI 设置:只影响本面板文案,不参与翻译管线判定,协议不消费。
+	// 手选制,不做游戏语言自动探测(v2 记录 $.Language 探针 2026-10-29 失效过;QOLLOCK 同为纯手选)。
+	function uiLang() {
+		return (cfg && cfg.uiLang === "en") ? "en" : "zh";
+	}
+
+	// 双向查找表:zh 与 en 文本都作为键指向同一条目(切 en 再切回 zh 可逆还原)。
+	// 表缺失/键未命中一律原样返回 —— 永远显示原文,绝不显示裸键。
+	const LOC_MAP = {};
+	let locEntryCount = 0;
+	function buildLocMap() {
+		locEntryCount = 0;
+		try {
+			if (typeof LCT_TEXT_I18N === "object" && LCT_TEXT_I18N) {
+				for (const zhKey in LCT_TEXT_I18N) {
+					if (!Object.prototype.hasOwnProperty.call(LCT_TEXT_I18N, zhKey)) { continue; }
+					const en = LCT_TEXT_I18N[zhKey];
+					if (typeof en !== "string" || zhKey === "" || en === "" || zhKey === en) { continue; }
+					const entry = { zh: zhKey, en: en };
+					LOC_MAP[zhKey] = entry;
+					LOC_MAP[en] = entry;
+					locEntryCount++;
+				}
+			}
+		} catch (e0) {}
+		log("i18n entries: " + locEntryCount + (locEntryCount > 0 ? "" : " (table missing - zh passthrough)"));
+	}
+
+	function localizeText(s) {
+		if (typeof s !== "string" || s === "") { return s; }
+		const e = LOC_MAP[s];
+		if (!e) { return s; }
+		const v = e[uiLang()];
+		return (typeof v === "string" && v !== "") ? v : s;
+	}
+
+	// 状态文本:整句查表;带动态后缀的(如 "已连接 build=xxxx")按前缀翻译保留后缀,
+	// 前缀表只服务 en 界面(zh 即源语言,原样显示)。
+	function localizeStatus(s) {
+		const ex = localizeText(s);
+		if (ex !== s) { return ex; }
+		if (uiLang() !== "en") { return s; }
+		try {
+			if (typeof LCT_STATUS_PREFIX === "object" && LCT_STATUS_PREFIX) {
+				for (const p in LCT_STATUS_PREFIX) {
+					if (p && s.indexOf(p) === 0) { return String(LCT_STATUS_PREFIX[p]) + s.slice(p.length); }
+				}
+			}
+		} catch (e0) {}
+		return s;
+	}
+
+	// 静态文案与菜单选项的填充点:XML 里的 zh 文本即源语言,读当前文本 → 查表 → 写回。
+	// 幂等(已译文本再查表命中同条目原值);表缺失时原样写回,零副作用。
+	const LOC_IDS = [
+		"LCTTxtTitle", "LCTTxtMenuEntry",
+		"LCTTxtRowEnabled", "LCTTxtHintEnabled",
+		"LCTTxtRowTarget", "LCTTxtHintTarget",
+		"LCTTxtRowDisplay", "LCTTxtHintDisplay",
+		"LCTTxtRowOutgoing", "LCTTxtHintOutgoing",
+		"LCTTxtRowOutTarget",
+		"LCTTxtRowForce", "LCTTxtHintForce",
+		"LCTTxtRowTranslateOwn", "LCTTxtHintTranslateOwn",
+		"LCTTxtRowTimeout", "LCTTxtRowUiLang"
+	];
+	const LOC_MENUS = ["LCTMenuTarget", "LCTMenuDisplay", "LCTMenuOutgoing", "LCTMenuOutTarget", "LCTMenuTimeout", "LCTMenuUiLang"];
+
+	function localizeLabelInPlace(p) {
+		try {
+			if (p && typeof p.text === "string" && p.text !== "") { p.text = localizeText(p.text); }
+		} catch (e0) {}
+	}
+
+	function applyTexts() {
+		for (let i = 0; i < LOC_IDS.length; i++) { localizeLabelInPlace(findById(LOC_IDS[i])); }
+		for (let m = 0; m < LOC_MENUS.length; m++) {
+			const menu = findById(LOC_MENUS[m]);
+			if (!menu) { continue; }
+			let n = 0;
+			try { n = menu.GetChildCount(); } catch (e0) { n = 0; }
+			for (let i = 0; i < n; i++) {
+				let opt = null;
+				try { opt = menu.GetChild(i); } catch (e1) { opt = null; }
+				if (!opt) { continue; }
+				try { localizeLabelInPlace((opt.GetChildCount && opt.GetChildCount() > 0) ? opt.GetChild(0) : null); } catch (e2) {}
+			}
+		}
+	}
 
 	/* ---------- 渲染 ---------- */
 
@@ -144,7 +243,7 @@
 			const val = String(cfg[skey]);
 			const map = LABELS[skey] || {};
 			if (!(val in map)) { log("render: unknown value " + skey + "=" + val); }
-			lbl.text = map[val] || val;
+			lbl.text = localizeText(map[val] || val);
 			markSelected(skey, val);
 		}
 	}
@@ -154,7 +253,9 @@
 		if (!menu) { return; }
 		let n = 0;
 		try { n = menu.GetChildCount(); } catch (e) { n = 0; }
-		const wantLabel = (LABELS[skey] || {})[String(val)];
+		const wantRaw = (LABELS[skey] || {})[String(val)];
+		// wantLabel 与菜单选项文本走同一 localizeText:任何界面语言下前缀匹配都成立
+		const wantLabel = wantRaw ? localizeText(wantRaw) : "";
 		const hits = [];
 		for (let i = 0; i < n; i++) {
 			const opt = menu.GetChild(i);
@@ -221,6 +322,8 @@
 		closeAllMenus();
 		render();
 		writeCfg();
+		// 界面语言变更:静态文案/菜单选项全部按新语言重填(render 只覆盖选择框标签)
+		if (key === "uiLang") { applyTexts(); }
 	});
 
 	exportFn("LCTUICloseAllMenus", closeAllMenus);
@@ -231,7 +334,10 @@
 		try {
 			const incoming = readCfg();
 			if (incoming && JSON.stringify(incoming) !== JSON.stringify(cfg)) {
+				const prevLang = cfg ? cfg.uiLang : null;
 				cfg = incoming;
+				// 协议侧权威配置带回的界面语言变化:静态文案一并重填
+				if (cfg.uiLang !== prevLang) { applyTexts(); }
 				render();
 			}
 			const sp = sharedPanel();
@@ -244,8 +350,11 @@
 				try { st = sp.GetAttributeString(ATTR_STATUS, ""); } catch (e2) {}
 				const stLbl = findById("LCTStatusText");
 				const dot = findById("LCTDot");
-				if (stLbl && st !== "" && st !== stLbl.text) {
-					stLbl.text = st;
+				// 显示用本地化文本做比较(否则 zh 原文 vs 已译文本每 tick 都判不等);
+				// 状态灯判类仍用协议原文前缀
+				const shown = localizeStatus(st);
+				if (stLbl && shown !== "" && shown !== stLbl.text) {
+					stLbl.text = shown;
 					if (dot) {
 						dot.RemoveClass("Ok");
 						dot.RemoveClass("Bad");
@@ -269,6 +378,10 @@
 			cfg = Object.assign({}, UI_DEFAULTS);
 			log("protocol cfg not published yet - using UI defaults (buttons stay live)");
 		}
+		// uiLang 兜底:缺失/未知值一律回 zh(与旧版纯中文行为一致)
+		if (cfg.uiLang !== "en" && cfg.uiLang !== "zh") { cfg.uiLang = "zh"; }
+		buildLocMap();
+		applyTexts();
 		render();
 		poll();
 	}
