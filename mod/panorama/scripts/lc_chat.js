@@ -208,11 +208,16 @@
 
 	function isTargetLanguageText(text) {
 		const t = targetLanguage().toLowerCase();
+		const s = String(text || "");
 		if (t.indexOf("zh") === 0) {
 			// 只有纯中文才跳过;中英混合仍需翻译(英文部分会原样留下)
-			return CJK_RE.test(text) && !/[A-Za-z]/.test(String(text || ""));
+			return CJK_RE.test(s) && !/[A-Za-z]/.test(s);
 		}
-		return false;
+		// 非中文目标(典型 en):字母全部为 ASCII latin → 视为已是目标语言,不重译
+		// (英文用户的英文闲聊不再产生重复标签;西里尔/韩文/假名等其它字母系统仍送翻。
+		//  \p 语法家族与 v2 生产同源,表情/数字/标点不参与判定)
+		const letters = s.replace(/\P{L}/gu, "");
+		return letters.length > 0 && !/[^\x00-\x7F]/.test(letters);
 	}
 
 	/* ---------- 跳过判定(v2 收敛版) ---------- */
