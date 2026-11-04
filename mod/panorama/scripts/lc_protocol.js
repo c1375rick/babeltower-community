@@ -64,6 +64,7 @@
 	let panelBound = false;
 	let docLoaded = false;
 	let waitingLoad = false;
+	let panelSeen = false;        // ensurePanel 至少成功过一次(信标 n= 字段)
 
 	let lastSeq = 0;
 	let tok = 0;
@@ -250,6 +251,7 @@
 			panel = p;
 			panelBound = false;
 		}
+		panelSeen = true;
 		bindPanel();
 		return panel;
 	}
@@ -369,7 +371,7 @@
 			safe("verticalAlign", "top");
 			safe("marginLeft", "20px");
 			safe("marginTop", "72px");
-			safe("width", "680px");
+			safe("width", "820px");
 			safe("height", "22px");
 			safe("backgroundColor", "#000000cc");
 			safe("fontSize", "13px");
@@ -393,16 +395,19 @@
 			// 诊断字段(信标期临时):st=属性自检,o=选举属性持有人 context 前缀,b=心跳年龄秒
 			let o = "";
 			let bAge = -1;
+			let eUi = "0";
 			try {
 				const cpD = claimPanel();
 				if (cpD) {
 					o = String(cpD.GetAttributeString(OWNER_ATTR, "")).split(".")[0] || "";
 					const beatD = parseFloat(cpD.GetAttributeString(BEAT_ATTR, "0")) || 0;
 					if (beatD > 0) bAge = Math.max(0, Math.round((nowMs() - beatD) / 1000));
+					if (String(cpD.GetAttributeString("lct_escui", "")) === "1") eUi = "1";
 				}
 			} catch (eD) {}
 			beacon.text = "LCT " + (beaconOnHud ? "H" : "R") + " " + ctx + " " + elect + "/" + state +
 				" st=" + attrSelfTest + " o=" + o + " b=" + bAge +
+				" e=" + eUi + " n=" + (panelSeen ? 1 : 0) + " d=" + (docLoaded ? 1 : 0) + " h=" + helloTries +
 				(buildId ? (" @" + String(buildId).slice(0, 8)) : "") +
 				" q=" + queue.length + " " + statusText;
 		} catch (e) {}

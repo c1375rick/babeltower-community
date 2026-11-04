@@ -278,6 +278,5 @@
 				</TabContents>
 			</Panel>
 		</Panel>
-		<CitadelHTMLPanel id="LCTNet" class="LCTNet" hittest="false" acceptsfocus="false" />
 	</CitadelHudEscapeMenu>
 </root>

@@ -16,6 +16,8 @@
 		<include src="s2r://panorama/styles/hud_common.vcss" />
 		<include src="s2r://panorama/styles/npc_icons.vcss" />
 		<include src="s2r://panorama/styles/hud.vcss" />
+		<!-- BabelTower: 协议面板样式(隐藏 CEF 面板 .LCTNet) -->
+		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
 	<scripts>
 		<!-- 诊断探针:同步静态 Label,证明本布局 scripts 求值(与 lc_protocol 存活解耦) -->
@@ -393,5 +395,11 @@
 		</Panel>
 		<HudPerfStatsBasics hittest="false" />
 		<Panel id="LoadInFadeCover" hittest="false" hittestchildren="false" />
+		<Panel id="LoadInFadeCover" hittest="false" hittestchildren="false" />
+		<!-- BabelTower: 协议 CEF 面板,声明在对局常驻可见树(CitadelHud 内)。
+		     v2 census 铁律:不可见面板 CEF 会暂停定时器/加载;Esc 菜单对局中隐藏,
+		     LCTNet 原声明在其内 = 页面加载很可能被推迟。QOLLOCK 的桥面板同样建在
+		     HUD 活树而非隐藏菜单。 -->
+		<CitadelHTMLPanel id="LCTNet" class="LCTNet" hittest="false" acceptsfocus="false" />
 	</CitadelHud>
 </root>

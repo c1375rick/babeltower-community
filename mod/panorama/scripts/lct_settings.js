@@ -174,6 +174,13 @@
 		}
 	}
 
+	// 活体标记(诊断期):本脚本在 Escape context 求值即写根面板属性 lct_escui=1,
+	// 由 lc_protocol 信标 e= 字段展示。同时充当"属性通道跨 context 写入"的实测样本。
+	try {
+		const grM = globalRoot();
+		if (grM) grM.SetAttributeString("lct_escui", "1");
+	} catch (eM) {}
+
 	log("window host ready");
 	try { $.Schedule(0.2, boot); } catch (e) { boot(); }
 })();
