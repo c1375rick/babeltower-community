@@ -209,15 +209,14 @@
 	function isTargetLanguageText(text) {
 		const t = targetLanguage().toLowerCase();
 		const s = String(text || "");
+		const hasCJK = CJK_RE.test(s);
 		if (t.indexOf("zh") === 0) {
-			// 只有纯中文才跳过;中英混合仍需翻译(英文部分会原样留下)
-			return CJK_RE.test(s) && !/[A-Za-z]/.test(s);
+			// 中文目标:纯中文(含汉字且无拉丁字母)才跳过;中英混合仍送翻
+			return hasCJK && !/[A-Za-z]/.test(s);
 		}
-		// 非中文目标(典型 en):字母全部为 ASCII latin → 视为已是目标语言,不重译
-		// (英文用户的英文闲聊不再产生重复标签;西里尔/韩文/假名等其它字母系统仍送翻。
-		//  \p 语法家族与 v2 生产同源,表情/数字/标点不参与判定)
-		const letters = s.replace(/\P{L}/gu, "");
-		return letters.length > 0 && !/[^\x00-\x7F]/.test(letters);
+		// 非中文目标(用户决策:从简):不含任何汉字 → 视为已达标的旁路;
+		// 含汉字的文本(纯中文/中英混合)一律送翻
+		return !hasCJK;
 	}
 
 	/* ---------- 跳过判定(v2 收敛版) ---------- */
