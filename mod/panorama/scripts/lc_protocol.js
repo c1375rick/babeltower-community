@@ -327,21 +327,14 @@
 
 	/* ---------- 诊断信标(临时,稳定后移除) ----------
 	 * con_logfile 实证抓不到 PanoramaScript 行,诊断只能靠画面自报。
-	 * 只挂 #Hud(不再兜底全局根):信标缺席 = chat/hudchat shadow 没加载(本文件没跑)。
-	 * 字段:br=选举/状态@buildId q=队列深度 st=状态文本
+	 * 形态:单个 Label(自动尺寸,不再套 0x0 Panel 容器 —— 旧形态疑似被裁剪)。
+	 * 只挂 #Hud(不再兜底全局根):信标缺席 = chat/hudchat shadow 没加载(本文件没跑)
+	 * 或不在对局(主菜单无 #Hud)。
+	 * 诊断期任何 context 都写文本:信标可见 = 本文件确实在跑;双 context 并存时
+	 * 文本在 primary/idle 间每秒交替 —— 这本身就是"两个 context 都活着"的证据。
+	 * 字段:ctx=宿主context 选举/状态@buildId q=队列深度 状态文本
 	 */
 	let beacon = null;
-	let beaconText = null;
-
-	function adoptBeacon(exist) {
-		const t = exist.FindChildTraverse("LCTBeaconText");
-		if (t) {
-			beacon = exist;
-			beaconText = t;
-			return true;
-		}
-		return false;
-	}
 
 	function ensureBeacon() {
 		if (beacon) {
@@ -349,33 +342,31 @@
 			try { ok = beacon.IsValid(); } catch (e) { ok = false; }
 			if (ok) return true;
 			beacon = null;
-			beaconText = null;
 		}
 		try {
-			const hud = getGlobalRoot().FindChildTraverse("Hud");
+			const root = getGlobalRoot();
+			const hud = root ? root.FindChildTraverse("Hud") : null;
 			if (!hud) return false;
 			// 跨 context 去重:另一 context 已建则直接采用
 			try {
 				const exist = hud.FindChildTraverse("LCTBeacon");
-				if (exist && adoptBeacon(exist)) return true;
+				if (exist) { beacon = exist; return true; }
 			} catch (e0) {}
-			const b = $.CreatePanel("Panel", hud, "LCTBeacon");
+			const b = $.CreatePanel("Label", hud, "LCTBeacon");
 			if (!b) return false;
-			const safe = function (p, k, v) { try { p.style[k] = v; } catch (eS) {} };
-			safe(b, "horizontalAlign", "left");
-			safe(b, "verticalAlign", "bottom");
-			safe(b, "margin", "12px");
-			safe(b, "backgroundColor", "rgba(8, 12, 20, 0.75)");
-			safe(b, "borderRadius", "4px");
-			safe(b, "padding", "4px 8px");
+			const safe = function (k, v) { try { b.style[k] = v; } catch (eS) {} };
+			safe("horizontalAlign", "left");
+			safe("verticalAlign", "bottom");
+			safe("margin", "12px");
+			safe("backgroundColor", "rgba(8, 12, 20, 0.85)");
+			safe("borderRadius", "4px");
+			safe("padding", "4px 8px");
+			safe("fontSize", "11px");
+			safe("color", "#9fe0a8");
+			safe("visibility", "visible");
 			try { b.hittest = false; } catch (e1) {}
 			try { b.acceptsfocus = false; } catch (e2) {}
-			const t = $.CreatePanel("Label", b, "LCTBeaconText");
-			safe(t, "color", "#9fe0a8");
-			safe(t, "fontSize", "11px");
-			try { t.hittest = false; } catch (e3) {}
 			beacon = b;
-			beaconText = t;
 			return true;
 		} catch (e) {
 			return false;
@@ -384,12 +375,11 @@
 
 	function updateBeacon() {
 		try {
-			if (!ensureBeacon() || !beaconText) return;
-			// 文本只有 primary 写:双 context 并存时避免 standby 用自己的选举态来回覆盖
-			if (elect !== "primary") return;
-			beaconText.text = "LCT br=" + elect + "/" + state +
-				(buildId ? ("@" + String(buildId).slice(0, 8)) : "") +
-				" q=" + queue.length + " st=" + statusText;
+			if (!ensureBeacon() || !beacon) return;
+			const ctx = String(myTag || "").split(".")[0] || "ctx";
+			beacon.text = "LCT " + ctx + " " + elect + "/" + state +
+				(buildId ? (" @" + String(buildId).slice(0, 8)) : "") +
+				" q=" + queue.length + " " + statusText;
 		} catch (e) {}
 	}
 

@@ -21,6 +21,22 @@
 	const ATTR_STATUS = "lct_status";
 	const ATTR_BUILDID = "lct_buildid";
 
+	// UI 本地默认值(与 lc_protocol.js 的 CFG_DEFAULTS 同形):协议侧尚未发布 lct_cfg
+	// 时(桥没起来/协议脚本未加载),设置窗口也必须完全可交互,而不是静默失效。
+	// 用户在默认态下的修改会写回共享属性;协议上线后 cfgWatchTick 采纳并落盘,
+	// 随后协议的权威配置(store 回载)经 poll 回流覆盖本 UI —— 竞态安全。
+	const UI_DEFAULTS = {
+		enabled: true,
+		targetLanguage: "zh-Hans",
+		displayMode: "bilingual",
+		outgoing: "off",
+		outgoingTarget: "en",
+		force: false,
+		translateOwn: true,
+		timeoutMs: 8000,
+		order: ["edge", "mymemory"]
+	};
+
 	function log(msg) { try { $.Msg("[LCT][TabUI] " + msg); } catch (e) {} }
 
 	// 同时挂到 $ 与 globalThis:XML 事件处理器以 $.X 形式调用(QOLLOCK 生产模式)
@@ -252,7 +268,13 @@
 	function boot() {
 		log("settings UI boot");
 		const got = readCfg();
-		if (got) { cfg = got; render(); }
+		if (got) {
+			cfg = got;
+		} else {
+			cfg = Object.assign({}, UI_DEFAULTS);
+			log("protocol cfg not published yet - using UI defaults (buttons stay live)");
+		}
+		render();
 		poll();
 	}
 

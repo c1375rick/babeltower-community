@@ -4,10 +4,15 @@
   底稿 = 游戏当前版 hud_escape_menu.vxml_c 的反编译重建(结构逐行保留),外加:
     1. <styles> 增加 lct_settings.vcss_c(样式必须与使用它的 UI 同 context 才生效)
     2. <scripts> 增加 lct_settings_ui.vjs_c(控件逻辑)+ lct_settings.vjs_c(窗口开关宿主)
-    3. EscapeBackground / EscapeButton / oncancel 先关我们的窗口再走原行为
+    3. root oncancel / EscapeBackground / EscapeButton 与游戏原文逐字一致(Esc 相关逻辑
+       全部在 lct_settings.vjs_c 里用 SetPanelEvent 挂钩 —— QOLLOCK 实证:被隐藏的窗口
+       面板会占住 MenuBack 焦点,此时 root 的 XML oncancel 根本不执行,窗口必须自带
+       oncancel 兜底;XML 属性里只留单语句调用)
     4. SubOptions 增加"BabelTower 翻译"入口按钮(独立按钮,不碰原生设置页)
-    5. 末尾声明 LCTSettingsWindow 静态窗口壳(内容 = 原 lct_settings_tab.xml 的行,
-       onactivate 一律走 $.X 守卫形式;面板可见性由 .LCTOpen 类驱动)
+    5. 末尾声明 LCTSettingsWindow 静态窗口壳(hittest + 空 onactivate 挡点击穿透,
+       同 QOLLOCK 的 SettingsWindow/SettingsBody/SettingsList 三层 hittest="true";
+       内容 = 原 lct_settings_tab.xml 的行,onactivate 一律走 $.X 守卫形式;
+       面板可见性由 .LCTOpen 类驱动)
   全程零 BLoadLayout、零运行时跨 context 注入(QOLLOCK 反编译实证:BLoadLayout 出现 0 次)。
 -->
 <root>
@@ -20,8 +25,8 @@
 		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
 		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
 	</scripts>
-	<CitadelHudEscapeMenu oncancel="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); } CitadelResumePlaying();">
-		<Panel id="EscapeBackground" onactivate="if ($.LCTIsSettingsOpen &amp;&amp; $.LCTIsSettingsOpen()) { $.LCTCloseSettingsWindow(true); } else { CitadelResumePlaying(); }" />
+	<CitadelHudEscapeMenu oncancel="CitadelResumePlaying()">
+		<Panel id="EscapeBackground" onactivate="CitadelResumePlaying()" />
 		<Panel id="LeftStripeBlur" />
 		<Panel id="LeftStripe" hittest="false">
 			<Panel id="Menu" hittest="false">
@@ -82,7 +87,7 @@
 			</Panel>
 		</Panel>
 		<CitadelPrivilegedFeatures id="PrivilegedFeatures" />
-		<CitadelBindingButton id="EscapeButton" action="MenuBack" onactivate="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); } CitadelResumePlaying();" text="#menu_resume" />
+		<CitadelBindingButton id="EscapeButton" action="MenuBack" onactivate="CitadelResumePlaying()" text="#menu_resume" />
 		<Panel id="RightSideBlur" hittest="false" />
 		<Panel id="RightSide" hittest="false">
 			<Panel id="PartySpacer" />
@@ -103,9 +108,10 @@
 		</Panel>
 		<!--
 		  设置窗口壳:静态声明(可用全部 class 样式,含 hover/transition),
-		  打开/关闭 = LCTOpen 类;点击窗口外落到 EscapeBackground(见上)关闭并返回游戏。
+		  打开/关闭 = LCTOpen 类;Esc/背景点击行为由 lct_settings.vjs_c 运行时挂钩管理
+		  (窗口 oncancel 兜底 + EscapeBackground JS 钩子,见该文件头注释)。
 		-->
-		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true">
+		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true" onactivate="">
 			<Panel class="LCTHeader">
 				<Label class="LCTHeaderText" text="BABELTOWER 翻译" />
 				<Panel class="LCTHeaderSpacer" />
@@ -114,7 +120,7 @@
 					<Label text="X" />
 				</Button>
 			</Panel>
-			<Panel id="LCTSettingsTabInstance" class="LCTTab">
+			<Panel id="LCTSettingsTabInstance" class="LCTTab" hittest="true">
 				<Panel class="LCTRow">
 					<Panel class="LCTLine">
 						<Panel class="LCTRowBody">
