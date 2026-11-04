@@ -10,7 +10,9 @@
 	 *       1) 窗口面板自带 oncancel:窗口开着 → 只关窗(菜单留在原地);
 	 *          窗口已关但仍占着 MenuBack 焦点(QOLLOCK 实证:此时 root 的 XML oncancel
 	 *          根本不执行,菜单会卡死)→ 主动 dispatch CitadelResumePlaying 救场。
-	 *       2) EscapeBackground onactivate 改挂 JS:窗口开着 → 只关窗;否则 resume。
+	 *       2) EscapeBackground onactivate 改挂 JS:窗口开着 → 只关窗;否则 resume;
+	 *          QOLLOCK 设置窗开着 → 替它收窗($.IsModSettingsOpen 存在才生效,
+	 *          单独安装时零行为变化,见 docs/COMPATIBILITY.md §5)。
 	 *       3) RegisterForUnhandledEvent("CitadelResumePlaying"):菜单因任何原因关闭时
 	 *          顺带关窗,避免下次打开菜单残留展开态。
 	 *       4) 打开窗口时 SetFocus(),保证 Esc 先落到窗口(QOLLOCK setOpen 同款)。
@@ -110,6 +112,24 @@
 
 	// EscapeBackground 钩子(QOLLOCK hookEscapeMenu 同款语义):
 	// 点背景 = 窗口开着时关窗并回游戏,否则正常回游戏。
+	// QOLLOCK 共存注意:SetPanelEvent 是替换语义,合并布局下后执行的脚本独占本钩子;
+	// 因此处理分支必须覆盖 QOLLOCK 窗口(其 API 全部存在性守卫,单独安装零行为变化):
+	//   本 mod 窗开 → 关窗+resume(resume 事件会顺带关 QOLLOCK 窗,它自己也注册了该监听);
+	//   QOLLOCK 窗开 → 替它收窗(ForceClose(true)),菜单留在原地 = 它自家背景语义;
+	//   两窗都关 → 正常 resume。
+	function qolSettingsOpen() {
+		try {
+			if (typeof $.IsModSettingsOpen !== "function") return false;
+			return $.IsModSettingsOpen() === true;
+		} catch (eQ) { return false; }
+	}
+
+	function qolForceClose() {
+		try {
+			if (typeof $.ForceCloseModSettings === "function") $.ForceCloseModSettings(true);
+		} catch (eQ) {}
+	}
+
 	function hookBackground() {
 		try {
 			const root = globalRoot();
@@ -118,6 +138,8 @@
 			bg.SetPanelEvent("onactivate", function () {
 				if (isOpen()) {
 					setOpen(false, true);
+				} else if (qolSettingsOpen()) {
+					qolForceClose();
 				} else {
 					dispatchResume();
 				}

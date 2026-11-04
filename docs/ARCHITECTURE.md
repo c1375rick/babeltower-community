@@ -1,8 +1,8 @@
 # BabelTower Community — 技术文档（架构与实现）
 
 > 本文是系统级总览：组件、数据流、工程决策及其证据、构建/验证工作流。
-> 协议线规格见 [PROTOCOL.md](PROTOCOL.md)，调试线见 [DEBUG.md](DEBUG.md)。
-> 三份文档分工：**ARCHITECTURE 讲"为什么这么建"，PROTOCOL 讲"线怎么跑"，DEBUG 讲"坏了怎么查"**。
+> 协议线规格见 [PROTOCOL.md](PROTOCOL.md)，调试线见 [DEBUG.md](DEBUG.md)，与其他模组共存见 [COMPATIBILITY.md](COMPATIBILITY.md)。
+> 文档分工：**ARCHITECTURE 讲"为什么这么建"，PROTOCOL 讲"线怎么跑"，DEBUG 讲"坏了怎么查"，COMPATIBILITY 讲"怎么和别人共存"**。
 
 ## 1. 项目定位
 
@@ -215,7 +215,7 @@ app/        桥页面（GitHub Pages 提供，单文件）
 mod/        模组源码 + build.ps1（§3 组件清单）
 dist/       构建产物 pak91_dir.vpk（gitignore）
 probe/      CEF 通路探针（协议事实测量工具，已使命完成，留作回归量具）
-docs/       PROTOCOL.md（协议规格）/ DEBUG.md（调试）/ 本文
+docs/       PROTOCOL.md（协议规格）/ DEBUG.md（调试）/ COMPATIBILITY.md（共存方案）/ 本文
 test/sim/   桥页面仿真工具（.omre review 期产物）
 _reference/ v2/参照模组资料镜像
 _build_check/ 当前游戏反编译底稿（证据基线，勿手改）
