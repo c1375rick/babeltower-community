@@ -86,26 +86,28 @@
 			// 关窗时收起所有下拉菜单,避免下次打开时残留展开态
 			try { if (typeof $.LCTUICloseAllMenus === "function") $.LCTUICloseAllMenus(); } catch (e2) {}
 		}
-		if (!open && resume === true && typeof CitadelResumePlaying === "function") {
-			try { CitadelResumePlaying(); } catch (e3) {}
+		if (!open && resume === true) {
+			dispatchResume();
 		}
 	}
 
-	// 窗口面板的 oncancel:焦点在窗口内时 Esc 落到这里
+	// 窗口面板的 oncancel:焦点在窗口内时 Esc 落到这里。
+	// 语义 = QOLLOCK handleModSettingsCancel/forceClose(true) 逐字对齐:
+	// 窗口开着 → 关窗并 resume(一次 Esc 直接回游戏);窗口已关但仍占着
+	// MenuBack 焦点(QOLLOCK 实证:此时 root 的 XML oncancel 不执行)→ 主动 resume。
 	function onWindowCancel() {
 		const t = nowMs();
 		if (t < cancelConsumedUntil) return; // 同一次 MenuBack 已被处理(窗口/root 双投递)
 		cancelConsumedUntil = t + CANCEL_DEDUP_MS;
 		if (isOpen()) {
-			setOpen(false, false); // 第一步:只关窗,菜单留在原地
+			setOpen(false, true);
 			return;
 		}
-		// 窗口已关但仍持有 MenuBack 焦点:root 的 XML oncancel 不会执行,
-		// 必须在这里主动 resume,否则 Esc 菜单卡死(QOLLOCK 实证行为)
 		dispatchResume();
 	}
 
-	// EscapeBackground 钩子(QOLLOCK hookEscapeMenu 同款):点背景 = 关窗或回游戏
+	// EscapeBackground 钩子(QOLLOCK hookEscapeMenu 同款语义):
+	// 点背景 = 窗口开着时关窗并回游戏,否则正常回游戏。
 	function hookBackground() {
 		try {
 			const root = globalRoot();
@@ -113,7 +115,7 @@
 			if (!bg) return;
 			bg.SetPanelEvent("onactivate", function () {
 				if (isOpen()) {
-					setOpen(false, false);
+					setOpen(false, true);
 				} else {
 					dispatchResume();
 				}
@@ -121,13 +123,11 @@
 		} catch (e) {}
 	}
 
-	// 菜单因任何路径关闭(resume 事件)→ 顺带关窗,并标记去重防止窗口 oncancel 重复 resume
+	// 菜单因任何路径关闭(resume 事件)→ 顺带关窗,避免下次打开菜单残留展开态
 	function hookResumeEvent() {
 		try {
 			if (typeof $.RegisterForUnhandledEvent !== "function") return;
 			$.RegisterForUnhandledEvent("CitadelResumePlaying", function () {
-				const t = nowMs();
-				cancelConsumedUntil = t + CANCEL_DEDUP_MS;
 				if (isOpen()) setOpen(false, false);
 			});
 		} catch (e) {

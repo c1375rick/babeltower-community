@@ -327,14 +327,15 @@
 
 	/* ---------- 诊断信标(临时,稳定后移除) ----------
 	 * con_logfile 实证抓不到 PanoramaScript 行,诊断只能靠画面自报。
-	 * 形态:单个 Label(自动尺寸,不再套 0x0 Panel 容器 —— 旧形态疑似被裁剪)。
-	 * 只挂 #Hud(不再兜底全局根):信标缺席 = chat/hudchat shadow 没加载(本文件没跑)
-	 * 或不在对局(主菜单无 #Hud)。
-	 * 诊断期任何 context 都写文本:信标可见 = 本文件确实在跑;双 context 并存时
-	 * 文本在 primary/idle 间每秒交替 —— 这本身就是"两个 context 都活着"的证据。
-	 * 字段:ctx=宿主context 选举/状态@buildId q=队列深度 状态文本
+	 * 形态:单个 Label(自动尺寸)。锚点:#Hud 优先(QOLLOCK 实证 id),
+	 * 找不到则落当前树的全局根并标记 R —— 信标文本的 H/R 前缀直接暴露
+	 * FindChildTraverse("Hud") 是否成功。跨 context 去重按锚点子树内查重。
+	 * 诊断期任何 context 都写文本:信标可见 = 本文件确实在跑;文本里的
+	 * ctx 字段 = 宿主 context id(如 Hud/EscapeMenu),双实例并存时文本交替
+	 * 本身就是"多个 context 都活着"的证据。
 	 */
 	let beacon = null;
+	let beaconOnHud = false;
 
 	function ensureBeacon() {
 		if (beacon) {
@@ -345,14 +346,17 @@
 		}
 		try {
 			const root = getGlobalRoot();
-			const hud = root ? root.FindChildTraverse("Hud") : null;
-			if (!hud) return false;
-			// 跨 context 去重:另一 context 已建则直接采用
+			if (!root) return false;
+			let anchor = null;
+			try { anchor = root.FindChildTraverse("Hud"); } catch (e1) {}
+			beaconOnHud = !!anchor;
+			if (!anchor) anchor = root;
+			// 跨 context 去重:同锚点子树内已建则直接采用
 			try {
-				const exist = hud.FindChildTraverse("LCTBeacon");
+				const exist = anchor.FindChildTraverse("LCTBeacon");
 				if (exist) { beacon = exist; return true; }
 			} catch (e0) {}
-			const b = $.CreatePanel("Label", hud, "LCTBeacon");
+			const b = $.CreatePanel("Label", anchor, "LCTBeacon");
 			if (!b) return false;
 			const safe = function (k, v) { try { b.style[k] = v; } catch (eS) {} };
 			safe("horizontalAlign", "left");
@@ -364,8 +368,8 @@
 			safe("fontSize", "11px");
 			safe("color", "#9fe0a8");
 			safe("visibility", "visible");
-			try { b.hittest = false; } catch (e1) {}
-			try { b.acceptsfocus = false; } catch (e2) {}
+			try { b.hittest = false; } catch (e2) {}
+			try { b.acceptsfocus = false; } catch (e3) {}
 			beacon = b;
 			return true;
 		} catch (e) {
@@ -377,7 +381,7 @@
 		try {
 			if (!ensureBeacon() || !beacon) return;
 			const ctx = String(myTag || "").split(".")[0] || "ctx";
-			beacon.text = "LCT " + ctx + " " + elect + "/" + state +
+			beacon.text = "LCT " + (beaconOnHud ? "H" : "R") + " " + ctx + " " + elect + "/" + state +
 				(buildId ? (" @" + String(buildId).slice(0, 8)) : "") +
 				" q=" + queue.length + " " + statusText;
 		} catch (e) {}

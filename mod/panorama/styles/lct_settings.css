@@ -17,6 +17,8 @@
 	padding: 14px 18px 12px 18px;
 	visibility: collapse;
 	overflow: squish scroll;
+	/* 窗口前移到 EscapeBackground 之后(QOLLOCK 结构),必须显式压过后续菜单层 */
+	z-index: 5000;
 }
 .LCTSettingsWindow.LCTOpen {
 	visibility: visible;
