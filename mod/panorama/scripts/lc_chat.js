@@ -209,14 +209,14 @@
 	function isTargetLanguageText(text) {
 		const t = targetLanguage().toLowerCase();
 		const s = String(text || "");
-		const hasCJK = CJK_RE.test(s);
 		if (t.indexOf("zh") === 0) {
-			// 中文目标:纯中文(含汉字且无拉丁字母)才跳过;中英混合仍送翻
-			return hasCJK && !/[A-Za-z]/.test(s);
+			// 中文目标:纯中文(含汉字且无拉丁字母)才跳过;英/日/韩/俄等一律送翻
+			return CJK_RE.test(s) && !/[A-Za-z]/.test(s);
 		}
-		// 非中文目标(用户决策:从简):不含任何汉字 → 视为已达标的旁路;
-		// 含汉字的文本(纯中文/中英混合)一律送翻
-		return !hasCJK;
+		// 非中文目标(典型 en,用户明确要求):字母全部为 ASCII latin(英文)才跳过;
+		// 中文/日文/韩文/西里尔等其它文字系统一律送翻(表情/数字/标点不参与判定)
+		const letters = s.replace(/\P{L}/gu, "");
+		return letters.length > 0 && !/[^\x00-\x7F]/.test(letters);
 	}
 
 	/* ---------- 跳过判定(v2 收敛版) ---------- */
