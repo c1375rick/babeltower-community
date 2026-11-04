@@ -20,7 +20,7 @@
 	 *        only via store.get/put with "lct:" prefix; requests only to the CSP allowlist.
 	 */
 
-	var BUILD_ID = "3a7f19c2e5d84b06";
+	var BUILD_ID = "b1nge7d3a9c5f204";
 	var PROTO = 3;
 	var MAX_REQ = 32768;      // uplink payload cap (spec 11.2)
 	var MAX_VAL = 16384;      // store value cap (spec 6)
@@ -34,8 +34,6 @@
 	var seq = 0;
 	var cache = {};           // translation cache, document-lifetime
 	var pending = {};         // id -> {n, chunks, at}
-	var edgeToken = null;
-	var edgeTokenAt = 0;
 	var reqAt = 0;
 
 	function nextSeq() { seq += 1; return seq; }
@@ -117,48 +115,40 @@
 
 	var MM_LANG = { "zh-Hans": "zh-CN", "zh-Hant": "zh-TW", "en": "en", "ja": "ja", "ko": "ko", "fr": "fr", "de": "de", "es": "es" };
 
-	function getToken(deadline, cb) {
-		var now = Date.now();
-		if (edgeToken && (now - edgeTokenAt) < 8 * 60 * 1000) { cb(null, edgeToken); return; }
-		var t = Math.min(remaining(deadline), 3000);
-		if (t <= 0) { cb("budget"); return; }
-		fetchX("GET", "https://edge.microsoft.com/translate/auth", null, null, t, function (err, txt) {
-			if (err) { cb(err); return; }
-			var tok = String(txt).replace(/^\s+|\s+$/g, "");
-			if (!tok) { cb("empty-token"); return; }
-			edgeToken = tok;
-			edgeTokenAt = now;
-			cb(null, tok);
-		});
-	}
-
+	// Bing 免 Key 直译端点(Edge 浏览器内置翻译同款协议,v2 桥 2026-09-19 起生产在用):
+	//   POST https://edge.microsoft.com/translate/translatetext?to=X[&from=Y]&isEnterpriseClient=false
+	//   body = JSON 字符串数组;响应 [{detectedLanguage,translations:[{text}]}]
+	// 旧实现(auth 端点拿 token → cognitive translator)已死:edge.microsoft.com/translate/auth
+	// ~2026-08 就 404 下线(F:\BabelTower docs/architecture.md 端点沿革表;2026-11-04 实测仍 404),
+	// 本页的 edge 通道从未走通过,所有请求都在落 mymemory —— ja/ko 乱翻、fr 回显的根因。
+	// 真机 CEF CORS:translatetext 200 + ACAO:*(2026-11-01 无桥 PoC 实测,同页面 context)。
 	function trEdge(d, deadline, cb) {
 		if (!d.target) { cb("BAD_REQUEST"); return; }
-		getToken(deadline, function (err, tok) {
+		var u = "https://edge.microsoft.com/translate/translatetext?to=" + encodeURIComponent(d.target) + "&isEnterpriseClient=false";
+		if (d.source && d.source !== "auto") { u += "&from=" + encodeURIComponent(d.source); }
+		var body = JSON.stringify((d.items || []).map(function (it) { return String(it.t == null ? "" : it.t); }));
+		var t = remaining(deadline);
+		if (t <= 0) { cb("budget"); return; }
+		fetchX("POST", u, body, { "Content-Type": "application/json" }, t, function (err, txt) {
 			if (err) { cb(err); return; }
-			var url = "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=" + encodeURIComponent(d.target);
-			if (d.source && d.source !== "auto") { url += "&from=" + encodeURIComponent(d.source); }
-			var body = JSON.stringify((d.items || []).map(function (it) { return { Text: String(it.t) }; }));
-			var t = remaining(deadline);
-			if (t <= 0) { cb("budget"); return; }
-			fetchX("POST", url, body, { "Authorization": "Bearer " + tok, "Content-Type": "application/json" }, t, function (err2, txt) {
-				if (err2) { cb(err2); return; }
-				try {
-					var arr = JSON.parse(txt);
-					var out = [];
-					for (var i = 0; i < arr.length; i++) {
-						var tr = arr[i] && arr[i].translations && arr[i].translations[0];
-						out.push({ i: (d.items[i] ? d.items[i].i : i), t: tr ? String(tr.text) : "" });
-					}
-					cb(null, out);
-				} catch (e) { cb("parse"); }
-			});
+			try {
+				var arr = JSON.parse(txt);
+				var out = [];
+				for (var i = 0; i < arr.length; i++) {
+					var e0 = arr[i] || null;
+					var tr = e0 && e0.translations && e0.translations[0];
+					out.push({ i: (d.items[i] ? d.items[i].i : i), t: tr ? String(tr.text) : "" });
+				}
+				cb(null, out);
+			} catch (e) { cb("parse"); }
 		});
 	}
 
 	function trMm(d, deadline, cb) {
 		if (!d.target) { cb("BAD_REQUEST"); return; }
-		var src = (d.source && d.source !== "auto") ? d.source : "en";
+		// auto → "Autodetect"(MyMemory 原生支持,实测 こんにちは→您好 detected=ja);
+		// 旧实现静默当 "en",韩/日/法文被塞进 en|x 语言对 → 翻不动 → 原样回显(2026-11-04 实测)
+		var src = (d.source && d.source !== "auto") ? d.source : "Autodetect";
 		var to = MM_LANG[d.target] || d.target;
 		var out = [];
 		var idx = 0;
