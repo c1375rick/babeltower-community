@@ -1,7 +1,7 @@
 # 与其他模组的兼容性(QOL Lock 共存方案)
 
 > **状态**:追加式 · **最后核对**:2026-11-04
-> **证据口径**:双方 VPK 清单实测、QOLLOCK 反编译源码(`window.js`/布局 XML)、本机 `gameinfo.gi` + `.dmm.json`、三处独立社区文档交叉印证(见 §3)。
+> **证据口径**:双方 VPK 清单实测、QOLLOCK 反编译源码(`window.js`/布局 XML)、**QOLLOCK 官方源码仓库文档**(github.com/civo7/QOLLOCK,2026-11-04 核对,见 §8)、本机 `gameinfo.gi` + `.dmm.json`、三处独立社区文档交叉印证(见 §3)。
 > **一句话**:与 QOL Lock 的硬冲突只有 2 个同名布局文件;解法 = 槽位规则 + 合并布局兼容包 + 运行时背景钩子 QOL-aware 分支(已实现)。不装 QOL 时什么都不用做。
 
 ---
@@ -29,7 +29,9 @@
 | CEF 存储桥 | `QOLStorageBridge`(escape menu context) | `LCTNet`(hud context) | 零 |
 | Esc root oncancel | 双方都**不改 XML 原文**,全部运行时 `SetPanelEvent` 挂钩 | 同左 | 零 |
 | `CitadelResumePlaying` | `window.js:2249` 注册监听,菜单关闭时自关窗 | `hookResumeEvent` 同款 | 可组合(都关自己的窗) |
-| 聊天翻译 | `ql_chat_translate/manifest.js`:硬编码 `OWNER_ACCOUNT_ID = "841196165"`(作者本人)+ 本机 `127.0.0.1:8765` 服务 | 完整翻译管线 | **零**(该功能对任何其他用户是死代码) |
+| 聊天翻译 | `ql_chat_translate/manifest.js`:硬编码 `OWNER_ACCOUNT_ID = "841196165"`(作者本人)+ 本机 `127.0.0.1:8765` 服务 | 完整翻译管线 | **零**(该功能对任何其他用户是死代码;官方文档亦声明账号门控,见 §8.3) |
+| 聊天区域所有权 | 官方声明(§8):`ql_chat_geometry` 是**唯一**聊天几何写手;`ql_chat_images` 拥有图片子节点;翻译实验只在原文旁显示图片、不写原文 | 本 mod 只往消息注入双语子节点,不动几何、不改原文 | 零(子节点并列,所有权分离) |
+| 许可证 | Apache-2.0 | AGPL-3.0-or-later | 代码不互斥;**合并包若含 QOL XML 片段,分发须附其 LICENSE/NOTICE 归属**(§8.5) |
 
 ---
 
@@ -62,14 +64,14 @@
 
 **设计**:超集 = 当前游戏底稿 + 本 mod 插入 + QOL 插入。
 
-- QOL 的 `hud.xml` 相对游戏底稿**只加 include、不加面板**(实测 diff:2 条样式 include + ~82 条脚本 include + 1 行 `GlobalClassListener`;唯一结构差异是旧底稿缺 `gMinimapTargeting`,属游戏版本漂移非 QOL 特性)→ 合并 = 我们的 `hud.xml` + QOL 的 include 行。
+- QOL 的 `hud.xml` 相对游戏底稿**只加 include、不加面板**(实测 diff:2 条样式 include + ~82 条脚本 include + 1 行 `GlobalClassListener`;唯一结构差异是旧底稿缺 `gMinimapTargeting`,属游戏版本漂移非 QOL 特性)→ 合并 = 我们的 `hud.xml` + QOL 的 include 行。**官方所有权文档印证**(其仓库 `docs/NATIVE_LAYOUTS.md`,§8.1):`hud.xml` 的 QOL 边界 = "HUD script load graph, shared styles and class listeners";`hud_escape_menu.xml` 边界 = "Independent settings script/style context and settings controls"。
 - `hud_escape_menu.xml` 另需 graft:QOL 的窗口面板 + 入口按钮 + `QOLStorageBridge` + 样式 include(参考反编译件 `_reference/hud_escape_menu_qollock.xml`)。
 - 本 mod 的 XML 内所有插入行都带 `<!-- BabelTower: ... -->` 标记注释,机器可定位。
 - **兼容包只含这 2 个 XML**;双方其余文件从各自 pak 加载(§3.3)。
 
 **构建步骤**(需要时执行):
 
-1. 用 `F:\dev-tools\Source2Viewer-CLI-20.1` 反编译**当时实际安装的 QOL VPK** 的两个 `vxml_c`——历史参考件基于旧游戏底稿,直接用 = 漂移。
+1. 用 `F:\dev-tools\Source2Viewer-CLI-20.1` 反编译**当时实际安装的 QOL VPK** 的两个 `vxml_c`——历史参考件基于旧游戏底稿,直接用 = 漂移。漂移判据可量化:QOLLOCK 源码仓库的 `upstream.json` 记录其每个 layout 覆盖所基于的 GameTracking-Deadlock commit,与当前游戏底稿 commit 对不齐即漂移(§8.2)。
 2. 反编译当前游戏 `pak01` 的同名文件,与我们的 shadow XML 比对(漂移 = FATAL,先重对底稿)。
 3. 以我们的 XML 为基底,插入 QOL 的 include/面板行(避开 `BabelTower:` 标记区)。
 4. 打包为**低槽位** VPK(§4.3),只含两个 XML。
@@ -115,5 +117,17 @@ Select-String -Path "C:\SteamLibrary\steamapps\common\Deadlock\game\citadel\cons
 ## 7. 维护(游戏更新后)
 
 1. **底稿重对**:重反编译游戏 `pak01` 的两个布局文件,与本 mod shadow XML 比对——任何漂移都是 FATAL(会破坏整个对局 HUD)。
-2. **QOL 重取**:用户装的 QOL 版本可能已更新,其 include 清单可能变化 → 合并包按 §4.2 重做。
+2. **QOL 重取**:用户装的 QOL 版本可能已更新,其 include 清单可能变化 → 合并包按 §4.2 重做;先用其仓库 `upstream.json` 的底稿 commit 与当前游戏对齐校验(§8.2)。
 3. **gameinfo.gi**:确认 `Game citadel/addons` 行还在(被更新重置则 DMM/手工补回)。
+
+---
+
+## 8. QOLLOCK 官方源码仓库情报(2026-11-04 核对)
+
+仓库:github.com/civo7/QOLLOCK(源码工程;分发版在 GameBanana 650634 / GitHub Releases)。**官方文档没有专门的 mod 间兼容章节**(README 仅要求报 bug 时附"any other HUD mods you use"),但以下内容直接服务共存方案:
+
+1. **`docs/NATIVE_LAYOUTS.md` = 官方布局所有权地图**,是合并包 graft 清单的权威来源(比反编译更权威):逐 layout 声明 QOLLOCK 的改动边界。其哲学是"只改样式就扩展现有 CSS,不复制 XML"——party/unit-target/商店统计/`hud_health` 等纯样式 XML override 已被官方主动退役,**其 XML 覆盖面趋势是收缩**,对共存是长期利好。
+2. **`upstream.json` = 机器可读底稿对齐表**:记录每个被覆盖游戏文件基于的 GameTracking-Deadlock commit 与 blob(`layout/hud.xml`、`layout/hud_escape_menu.xml` 均在列)。合并包构建时用它校验 QOL 底稿与当前游戏是否同版——对不齐 = 漂移, graft 源必须重取。
+3. **聊天翻译账号门控是官方结论**:`ARCHITECTURE.md` §11 "Chat translation is account-gated" + `docs/features/ql_chat_translation.md` "account-restricted experiment…has no public persisted toggle"。§2 的"对其他用户是死代码"由反编译推断升级为**官方声明**。
+4. **构建工具链相同**:双方都用 Reduced CSDK 12 编译打包,产物形态一致,无额外差异面。
+5. **Apache-2.0**:QOLLOCK 原创部分为 Apache-2.0(Apache-2.0 与 AGPL-3.0 可合并)。合并兼容包含其 XML 片段时,分发须随包保留其 LICENSE/NOTICE 归属信息。
