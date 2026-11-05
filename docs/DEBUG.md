@@ -49,11 +49,12 @@ Steam 库 → Deadlock 右键 → 属性 → 常规 → 启动选项 → 填 `-c
 `[LCT][TabUI]` 关键锚点（Build 10931 内联退役后新增）：
 
 ```
-controls bound: toggles=3 selects=5 options=24 [MISSED=N]
+controls bound: toggles=3 selects=6 options=24 [MISSED=N]
 ```
 
 每次设置页装载后由 `LCTUIBindControls` 打出。toggles/selects/options
-是确定性绑定成功的控件数（满额 3/5/24）；出现 `MISSED=` 即"选项文本
+是确定性绑定成功的控件数（满额 3/6/24，即 3 开关+6 下拉+24 选项）；
+出现 `MISSED=` 即"选项文本
 ↔ LABELS 匹配"有漏网（通常 = 本地化表与 XML 选项文本不同步，或绑定
 先于 applyTexts 的时序倒挂），此时对应下拉的选项点了没反应。开关和
 点击动作本身无独立日志——判"控件死活"以本行为准。
@@ -67,6 +68,12 @@ controls bound: toggles=3 selects=5 options=24 [MISSED=N]
 M2 = `#ChatMessages` 可达；M3 = 绝对根建宿主；M4 = SubOptions 直达 +
 Esc 菜单按钮注入；M5 = BLoadLayout 设置页渲染/关闭；M6 = CEF 传输
 （SetURL → HTMLTitle 回收）。判决链存档见 ARCHITECTURE.md §6 决策 2。
+
+`[LCTX]` 来自设置页页脚 canary 按钮（2026-11-05/06 内联 context 终判
+实验，判决归档后已移除，生产包不再产生）：单行报内联 context 的
+`$.LCTUIToggle` / `globalThis.LCTUIToggle` 可达性。判决（10 条输出，
+均 `undefined|undefined`）：内联会触发但解析在独立 context，装载者
+导出不可见——存档见 INTEGRATION.md §7。
 
 ## 出站翻译的日志轨迹（排查时按此对账）
 
