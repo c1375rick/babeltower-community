@@ -147,7 +147,7 @@ API 在本 build 的实证：DLMusic/QOLLOCK 反编译源同款用法；替换�
 | # | 决策 | 证据 | 失败形态（当时的最大风险） |
 |---|---|---|---|
 | 1 | 桥接架构（远程静态页 + CEF 面板） | 6726 版本把声明层外部 URL 清零、JS 网络通道全灭（census）；`CitadelHTMLPanel` 的 SetURL/HTMLTitle 是 probe 实测唯一存活通道 | 无网络 → 全功能不可用（已排除） |
-| 2 | **窄面回归**：只 shadow chat.xml，永不碰 hud.xml（2026-11-05 推翻旧决策） | 旧"chat.xml 脚本不执行"判决系 $.Time 污染假阳性——零依赖探针三信号全中，M1-M6 证明 SubOptions/BLoadLayout/CitadelHTMLPanel 全部 chat context 可达（`_compat/probe/` 存档）；窄面 = 与 QOL/任何 hud mod 文件面零交集，合并包整类退役 | shadow 漂移 = 聊天 FATAL（v2 TargetHeroImage 教训）→ 每次游戏更新重反编译比对（chat.xml 头注释 + COMPATIBILITY §7） |
+| 2 | **窄面回归**：只 shadow chat.xml，永不碰 hud.xml（2026-11-05 推翻旧决策） | 旧"chat.xml 脚本不执行"判决系 $.Time 污染假阳性——零依赖探针三信号全中，M1-M6 证明 SubOptions/BLoadLayout/CitadelHTMLPanel 全部 chat context 可达（`_compat/probe/` 存档）；窄面 = 与 QOL/任何 hud mod 文件面零交集，合并包整类退役。模式已单独成文 [INTEGRATION.md](INTEGRATION.md)（作为可推广的通用 Panorama mod 集成方案） | shadow 漂移 = 聊天 FATAL（v2 TargetHeroImage 教训）→ 每次游戏更新重反编译比对（chat.xml 头注释 + COMPATIBILITY §7） |
 | 3 | `$.Time()` 不可用，全部 `nowMs()` 守卫 | 6726 后 `$.Time` 缺失致 boot TypeError（探针实证） | 协议全死 → Date.now 封装 |
 | 4 | 协议单实例跑 chat.xml context（2026-11-05 起随窄面回归） | LCTNet 由 chat.xml XML 声明（4x4px/opacity 0.01/visible 生产隐藏配方，探针 M6 实证 CEF 传输）；选举保留作多 context 互斥兜底 | 双实例互踢 → 选举兜底 |
 | 5 | 出站钩子 = 跨 context `SetPanelEvent("oninputsubmit")` | DLMusic/QOLLOCK 反编译同款 API；替换语义活体实证 | 钩子不生效 → 出站静默失效，收消息不受影响 |

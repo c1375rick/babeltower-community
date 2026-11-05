@@ -54,6 +54,7 @@ CEF 桥接协议设计、VPK 工具链和一套可复用的零依赖探针方法
 | `docs/PROTOCOL.md` | v3 协议规格(上行 fragment / 下行 HTMLTitle 四帧 / store 持久化 / 安全边界) |
 | `docs/DEBUG.md` | 调试指南：-condebug 日志探针、[LCT] 标签、出站翻译轨迹对账 |
 | `docs/COMPATIBILITY.md` | 兼容性档案：QOL 共存史、合并包退役记录、游戏更新后重对流程(§7) |
+| `docs/INTEGRATION.md` | **窄面集成模式**：Esc 菜单运行时注入 + 独立页面装载，不 shadow HUD——可被任何 Panorama mod 采纳的手册 |
 | `app/d2a3dde88d180e5b/` | 桥页面(部署于 GitHub Pages,协议实现 + `store.*` 持久层 + 翻译上游) |
 | `mod/` | 模组本体源码(Panorama layout/scripts + `build.ps1` 编译打包) |
 | `probe/` | CEF 通路探针(协议事实的测量工具,见 PROTOCOL.md §1) |
