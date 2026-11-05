@@ -21,7 +21,7 @@ Deadlock 聊天翻译模组(桥接式架构:游戏 Panorama ↔ 远程静态页,
 powershell -ExecutionPolicy Bypass -File mod\build.ps1
 ```
 
-产物 `dist/pak91_dir.vpk`,复制到 `game/citadel/addons/` 即可。
+产物 `dist/pak03_dir.vpk`,复制到 `game/citadel/addons/` 即可。
 
 ## 桥页面
 
