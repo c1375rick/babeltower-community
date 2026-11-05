@@ -338,6 +338,10 @@
 	// 在页面装载后调用。菜单选项按"选项当前文本 ↔ localizeText(LABELS 值)"同源
 	// 匹配(与 markSelected 同一判据,不赌子节点顺序);未命中数入日志自报。
 	exportFn("LCTUIBindControls", function () {
+		// 前置自备:先按当前 uiLang 落位静态文案(applyTexts 幂等),保证选项文本与
+		// localizeText(LABELS) 同语言可匹配 —— 否则 en 界面下"绑定先于本地化"
+		// 会全量 MISSED(2026-11-05 自审发现;内联时代无此时序耦合,退役代价之一)。
+		applyTexts();
 		let boundToggles = 0;
 		for (const key in TOGGLES) {
 			if (!TOGGLES.hasOwnProperty(key)) { continue; }

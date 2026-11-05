@@ -46,6 +46,18 @@ Steam 库 → Deadlock 右键 → 属性 → 常规 → 启动选项 → 填 `-c
 | `[LCT][TabUI]` | lct_settings_ui.js | 设置窗口 UI |
 | `[LCT][Settings]` | lct_settings.js | 设置窗口宿主（含焦点归还：`focus returned to escape menu`） |
 
+`[LCT][TabUI]` 关键锚点（Build 10931 内联退役后新增）：
+
+```
+controls bound: toggles=3 selects=5 options=24 [MISSED=N]
+```
+
+每次设置页装载后由 `LCTUIBindControls` 打出。toggles/selects/options
+是确定性绑定成功的控件数（满额 3/5/24）；出现 `MISSED=` 即"选项文本
+↔ LABELS 匹配"有漏网（通常 = 本地化表与 XML 选项文本不同步，或绑定
+先于 applyTexts 的时序倒挂），此时对应下拉的选项点了没反应。开关和
+点击动作本身无独立日志——判"控件死活"以本行为准。
+
 ### 探针标签（历史实验，生产包不产生）
 
 `[LCTPROBE]` / `[LCTPROBE2]` 来自 `_compat/probe/` 两代信标（2026-11-05 窄面
