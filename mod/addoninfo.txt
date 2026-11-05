@@ -1,6 +1,6 @@
 {
 	"addon_title"	"BabelTower Community v3"
-	"addon_version"	"1.0.0"
+	"addon_version"	"1.0.1"
 	"addon_tagline"	"Deadlock chat translation (bridgeless)"
 	"addon_author"	"BabelTower"
 	"addon_description"	"Deadlock chat translation: bilingual chat, outgoing translation, Esc-menu settings page"
