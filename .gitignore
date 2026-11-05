@@ -5,3 +5,5 @@ _qollock-ref/
 _build_check/
 _compat/panorama/
 _compat/addoninfo.txt
+_compat/probe/panorama/
+_compat/probe/_work/

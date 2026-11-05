@@ -1,13 +1,15 @@
 <#
-  BabelTower v3 — Minimal Skeleton Build
-  编译 mod/ 下的 .xml/.js/.css → RED2 二进制 → 打包 dist/pak91_dir.vpk
+  BabelTower v3 — Narrow-face build (2026-11-05 chat.xml 回归)
+  编译 mod/ 下的 .xml/.js/.css → vxml_c/vjs_c/vcss_c → 打包 dist/pak03_dir.vpk
+  窄面:只覆盖 chat.xml(脚本执行已实证),不碰 hud.xml —— QOL/任何 hud mod
+  文件面零交集,合并兼容包(_compat)整类退役。pak91 shadow 一并废弃。
 #>
 
 param(
 	[string]$Csdk = "F:\dev-tools\Reduced_CSDK_12",
 	[string]$VpkCli = "F:\dev-tools\VPKEdit\vpkeditcli.exe",
-	[string]$AddonName = "lctskeleton",
-	[string]$VpkName = "pak91_dir.vpk"
+	[string]$AddonName = "lctnarrow",
+	[string]$VpkName = "pak03_dir.vpk"
 )
 
 $ErrorActionPreference = "Stop"

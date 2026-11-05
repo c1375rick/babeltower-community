@@ -8,6 +8,12 @@
 
 ## 1. 结论速览
 
+> **⚠ 2026-11-05 整体退役**：窄面回归后本文件所述合并方案**不再使用**——v3 只
+> 覆盖 `chat.xml`（脚本执行已由零依赖探针实证，d186fbb 判决系 `$.Time` 污染
+> 假阳性），与 QOL/任何 hud mod 文件面零交集，无需任何合并。本文保留作为历史
+> 记录与教训库（§8 的 upstream.json 漂移情报仍然有效）。合并包构建脚本
+> `_compat/build_compat.ps1` 保留但不再维护；探针全套在 `_compat/probe/`。
+
 | 问题 | 结论 |
 |---|---|
 | 文件冲突面 | **恰好 2 个**:`panorama/layout/hud.vxml_c` + `hud_escape_menu.vxml_c`(QOL 共 74 文件,其余不撞名) |
@@ -60,7 +66,7 @@
 | 都装,无合并包 | 同名文件二选一(低槽胜),另一方**静默死亡** | 必须做 §4.2 |
 | 都装 + 合并包(槽位更低) | 双方都活 | 合并包槽位 < QOL 最低槽 |
 
-### 4.2 合并布局兼容包(推荐方案)
+### 4.2 合并布局兼容包(2026-11-05 已退役,历史方案)
 
 **设计**:超集 = 当前游戏底稿 + 本 mod 插入 + QOL 插入。
 
@@ -136,8 +142,14 @@ Select-String -Path "C:\SteamLibrary\steamapps\common\Deadlock\game\citadel\cons
 
 ## 7. 维护(游戏更新后)
 
-1. **底稿重对**:重反编译游戏 `pak01` 的两个布局文件,与本 mod shadow XML 比对——任何漂移都是 FATAL(会破坏整个对局 HUD)。
-2. **QOL 重取**:用户装的 QOL 版本可能已更新,其 include 清单可能变化 → 合并包按 §4.2 重做;先用其仓库 `upstream.json` 的底稿 commit 与当前游戏对齐校验(§8.2)。
+1. **chat.xml 底稿重对(窄面唯一覆盖面,FATAL 级)**:用 Source2Viewer 反编译当前
+   游戏 `pak01` 的 `panorama/layout/chat.vxml_c`,与 `mod/panorama/layout/chat.xml`
+   减去我们追加块(头部注释列明的三处)后逐字比对——任何漂移都可能是
+   FATAL(v2 TargetHeroImage 9 连 crash 教训:引擎按 snippet 找子面板,找不到即
+   Plat_FatalError)。流程与嫁接脚本见 `_compat/probe/build.ps1`(graft 逻辑可复用)。
+2. ~~QOL 重取/合并包~~:**已随窄面回归退役**——不再需要任何 QOL 相关维护。
+   QOL 自身与当前构建的漂移(如 2026-11-05 实测"提醒购买物品"在纯 QOL 态也坏)
+   是 QOL 上游问题,与本 mod 解耦。
 3. **gameinfo.gi**:确认 `Game citadel/addons` 行还在(被更新重置则 DMM/手工补回)。
 
 ---

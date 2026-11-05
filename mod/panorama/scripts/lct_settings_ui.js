@@ -2,7 +2,7 @@
 	"use strict";
 
 	/*
-	 * BabelTower v3 — 设置窗口控件逻辑(由 hud_escape_menu.xml 引入,运行于 Escape Menu context)
+	 * BabelTower v3 — 设置页控件逻辑(HUD context,由 hud.xml 引入;2026-11-05 迁移)
 	 *
 	 * 与协议(chat context 的 lc_protocol.js)不通 JS,唯一通道 = 共享面板(#Hud/root)属性:
 	 *   lct_cfg      配置 JSON(lc_protocol boot 发布默认值 → store 回载覆盖;本 UI 修改后写回,
@@ -10,7 +10,8 @@
 	 *   lct_status   桥状态文本(协议 primary 写)
 	 *   lct_buildid  桥页面 buildId(协议 primary 写)
 	 *
-	 * 窗口壳/控件面板由 hud_escape_menu.xml 静态声明;XML 的 onactivate 通过 $.LCTUI* 调用
+	 * 窗口壳/控件面板由 lct_settings_page.xml 声明(lct_boot.js BLoadLayout 装载,同在
+	 * HUD context);XML 的 onactivate 通过 $.LCTUI* 调用
 	 * 本文件导出的函数(同时挂 $ 与 globalThis,QOLLOCK 同款 $.X 暴露形式)。
 	 *
 	 * 依赖 lct_i18n.js:无声明全局 LCT_TEXT_I18N / LCT_STATUS_PREFIX(纯数据表,
@@ -327,6 +328,8 @@
 	});
 
 	exportFn("LCTUICloseAllMenus", closeAllMenus);
+	// lct_boot.js 消费:注入按钮/装载页面后重刷静态文案(按钮标签 LCTTxtMenuEntry 等)
+	exportFn("LCTUIApplyTexts", applyTexts);
 
 	/* ---------- 轮询共享属性 ---------- */
 

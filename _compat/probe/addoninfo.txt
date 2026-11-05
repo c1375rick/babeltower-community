@@ -1,0 +1,8 @@
+{
+	"addon_title"	"LCT chat.xml Probe"
+	"addon_version"	"1.0.0"
+	"addon_tagline"	"Zero-dep beacon retest: do chat.xml scripts execute (2026-11-05)"
+	"addon_author"	"BabelTower Community"
+	"addon_description"	"Temporary probe pak. Vanilla chat layout + one beacon script. Restores compat pak03 after the test."
+	"addon_content"	"panorama"
+}

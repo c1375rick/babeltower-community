@@ -1,45 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  BabelTower v3 — Escape Menu 布局覆盖(QOLLOCK 生产模式)
-  底稿 = 游戏当前版 hud_escape_menu.vxml_c 的反编译重建(结构逐行保留),外加:
-    1. <styles> 增加 lct_settings.vcss_c(样式必须与使用它的 UI 同 context 才生效)
-    2. <scripts> 增加 lct_settings_ui.vjs_c(控件逻辑)+ lct_settings.vjs_c(窗口开关宿主)
-    3. root oncancel / EscapeBackground / EscapeButton 与游戏原文逐字一致(Esc 相关逻辑
-       全部在 lct_settings.vjs_c 里用 SetPanelEvent 挂钩 —— QOLLOCK 实证:被隐藏的窗口
-       面板会占住 MenuBack 焦点,此时 root 的 XML oncancel 根本不执行,窗口必须自带
-       oncancel 兜底;XML 属性里只留单语句调用)
-    4. SubOptions 增加"BabelTower 翻译"入口按钮(独立按钮,不碰原生设置页)
-    5. 末尾声明 LCTSettingsWindow 静态窗口壳(hittest + 空 onactivate 挡点击穿透,
-       同 QOLLOCK 的 SettingsWindow/SettingsBody/SettingsList 三层 hittest="true";
-       内容 = 原 lct_settings_tab.xml 的行,onactivate 一律走 $.X 守卫形式;
-       面板可见性由 .LCTOpen 类驱动)
-    6. 本地化:静态文案标签带 LCTTxt* id(lct_settings_ui.js 的 applyTexts 按当前
-       界面语言 zh/en 重填,数据在 lct_i18n.js);新增"界面语言"选择行(uiLang)。
-       lct_i18n.vjs_c 必须在 lct_settings_ui.vjs_c **之前** include(装载顺序契约)。
-  全程零 BLoadLayout、零运行时跨 context 注入(QOLLOCK 反编译实证:BLoadLayout 出现 0 次)。
+  BabelTower v3 — 全屏设置页(独立 XML,2026-11-05 迁移产物)
+  迁移:设置窗口不再内嵌 Esc 菜单(hud_escape_menu.xml 已删除),改由 lct_boot.js
+  在 HUD context 运行时 BLoadLayout 本页 —— 单一构建适配原版/QOL/任何 esc mod,
+  零布局合并竞争。
+  规则:
+    1. 窗口标记 = 原 hud_escape_menu.xml LCTSettingsWindow 块逐字搬运,内部
+       ID/class 一律不变(lct_settings_ui.js 的 findById/applyTexts/render 零改动可用)。
+    2. 本文件**零 <scripts>**:BLoadLayout 内联 onactivate 的 context 归属按
+       "内联跟随装载者(HUD context)"假设,处理器一律 $.X 存在性守卫(不炸任何
+       context);实测若内联失效,由 lct_boot.js 的 SetPanelEvent 确定性重绑兜底。
+    3. 开/关 = 页根 .LCTOpen 类(见 lct_settings.css 尾部页根规则);Esc 语义由
+       lct_settings.js 接管(页根 oncancel + escPoll),lct_boot.js 确定性绑定
+       页根 onactivate(点暗背板收页)/关闭按钮/窗口空 onactivate(挡穿透)。
+    4. 样式自包含:跨 context 样式从不依赖(QOLLOCK 生产实证),本页自己 include
+       所需样式表(citadel_base_styles 供按钮/标签默认样式,lct_settings 供全部
+       LCT* 控件样式)。
+    5. 结构 shim:Panorama 禁止布局根面板带 id(resourcecompiler 实证:"Found root
+       panel with 'id' attribute, which is not permitted"),故页根外套一层无 id
+       全屏 shim(hittest=false 不挡输入,子树寻址不受影响);带 id 的页根在 shim
+       内,findById/FindChildTraverse 照常命中。
 -->
 <root>
 	<styles>
 		<include src="s2r://panorama/styles/citadel_base_styles.vcss_c" />
-		<include src="s2r://panorama/styles/hud_escape_menu.vcss_c" />
 		<include src="s2r://panorama/styles/lct_settings.vcss_c" />
-		<include src="s2r://panorama/styles/lct_net.vcss_c" />
 	</styles>
-	<scripts>
-		<include src="s2r://panorama/scripts/lct_i18n.vjs_c" />
-		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
-		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
-		<!-- lc_protocol 不在此引入:协议单实例运行于 hud.xml(对局常驻可见 context)。
-		     实测(信标 o=EscapeMenu b=0)本 context 的实例能赢得选举,但主角色落在
-		     对局中隐藏的菜单树不可控 —— QOLLOCK 同款原则:调度与协议只在 HUD context。 -->
-	</scripts>
-	<CitadelHudEscapeMenu oncancel="CitadelResumePlaying()">
-		<Panel id="EscapeBackground" onactivate="CitadelResumePlaying()" />
-<!--
-		  设置窗口壳:静态声明(可用全部 class 样式,含 hover/transition),
-		  打开/关闭 = LCTOpen 类;Esc/背景点击行为由 lct_settings.vjs_c 运行时挂钩管理
-		  (窗口 oncancel 兜底 + EscapeBackground JS 钩子,见该文件头注释)。
-		-->
+	<Panel hittest="false" style="width: 100%; height: 100%;">
+		<Panel id="LCTSettingsPage" class="LCTSettingsPage" hittest="true">
 		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true" onactivate="">
 			<Panel class="LCTHeader">
 				<Label id="LCTTxtTitle" class="LCTHeaderText" text="BABELTOWER 翻译" />
@@ -221,84 +209,6 @@
 				</Panel>
 			</Panel>
 		</Panel>
-	<Panel id="LeftStripeBlur" />
-		<Panel id="LeftStripe" hittest="false">
-			<Panel id="Menu" hittest="false">
-				<Panel id="ContextualMenu">
-					<Panel class="MatchmakingOptions OptionGroup">
-						<Button id="matchmakingLeaveQueue" class="nav_menu_item primary leavequeue" onactivate="CitadelLeaveMatchmaking()">
-							<Label text="#menu_leave_queue" class="menuButtonLabel" antialias="true" />
-						</Button>
-						<Button id="matchmakingEditRoster" class="nav_menu_item primary" onactivate="CitadelEditMatchmakingRoster()">
-							<Panel class="MenuIcon" />
-							<Label text="#menu_edit_roster" class="menuButtonLabel" />
-						</Button>
-					</Panel>
-					<Panel class="ReconnectOptions OptionGroup">
-						<Button id="reconnectRejoin" class="nav_menu_item primary" onactivate="CitadelReconnect()" onmouseover="UIShowTextTooltip( #Citadel_Dashboard_RejoinTooltip )" onmouseout="UIHideTextTooltip()">
-							<Label text="#menu_rejoin" class="menuButtonLabel" />
-						</Button>
-						<Button id="reconnectAbandon" class="nav_menu_item primary endsession" onactivate="CitadelConfirmAbandonGame()">
-							<Label text="{s:reconnect_abandon_action}" class="menuButtonLabel" />
-						</Button>
-					</Panel>
-					<Button id="disconnect" class="nav_menu_item primary" onactivate="CitadelDisconnectFromGame()">
-						<Label text="#menu_disconnect" class="menuButtonLabel" />
-					</Button>
-					<Button id="abandon" class="nav_menu_item primary endsession" onactivate="CitadelConfirmAbandonGame()">
-						<Label text="{s:abandon_action}" class="menuButtonLabel" />
-					</Button>
-					<Button id="Unstick" class="nav_menu_item minor" onactivate="CitadelConCommand( 'unstick' );" onmouseover="CitadelUIShowTextTooltip( '#DevMenu_UnstickHeroTooltip' )" onmouseout="CitadelUIHideTextTooltip()">
-						<Label text="#DevMenu_UnstickHero" class="menuButtonLabel" />
-					</Button>
-				</Panel>
-				<Button id="changehero" class="nav_menu_item primary" onactivate="CitadelEscapeMenuChangeHero()">
-					<Label text="#menu_changehero" class="menuButtonLabel" />
-				</Button>
-				<Panel id="SubOptions">
-					<Panel class="FeedbackRow">
-						<Button id="PlayerFeedback" class="nav_menu_item minor" onactivate="CitadelShowPlayerFeedbackPopup()">
-							<Label text="#Citadel_PlayerFeedback_Title" class="menuButtonLabel" />
-						</Button>
-					</Panel>
-					<Panel class="SettingsRow">
-						<Button id="LCTModSettingsBtn" class="nav_menu_item minor" onactivate="if ($.LCTToggleSettingsWindow) { $.LCTToggleSettingsWindow(); }">
-							<Label id="LCTTxtMenuEntry" text="BabelTower 翻译" class="menuButtonLabel" />
-							<Image id="LCTSettingsGearIcon" class="smallIcon" src="s2r://panorama/images/icons/icon_gear.vsvg" />
-						</Button>
-					</Panel>
-					<Panel class="SettingsRow">
-						<Button id="settings" class="nav_menu_item minor" onactivate="CitadelSettings()">
-							<Panel class="smallIcon GearIcon" />
-							<Label text="#menu_settings" class="menuButtonLabel" />
-						</Button>
-						<Button id="QuickMute" class="nav_menu_item minor" onactivate="CitadelMuteButtonClicked();" onmouseover="CitadelUIShowTextTooltip( '#citadel_mute_game_audio' )" onmouseout="CitadelUIHideTextTooltip()" />
-					</Panel>
-					<Button id="quit" onactivate="CitadelQuitConfirm()">
-						<Label text="#menu_exit_deadlock" />
-					</Button>
-				</Panel>
-			</Panel>
-		</Panel>
-		<CitadelPrivilegedFeatures id="PrivilegedFeatures" />
-		<CitadelBindingButton id="EscapeButton" action="MenuBack" onactivate="CitadelResumePlaying()" text="#menu_resume" />
-		<Panel id="RightSideBlur" hittest="false" />
-		<Panel id="RightSide" hittest="false">
-			<Panel id="PartySpacer" />
-			<Panel class="FriendsOrPlayersTabs">
-				<Panel class="Center">
-					<TabButton id="FriendsTab" class="FriendsOrPlayersButton" group="people_list_tabs" text="#Citadel_Friends_WindowTitle" selected="true" />
-					<TabButton id="PlayersTab" class="FriendsOrPlayersButton" group="people_list_tabs" text="#Citadel_Players_WindowTitle" />
-				</Panel>
-			</Panel>
-			<Panel class="FriendsOrPlayersContents" hittest="false">
-				<TabContents id="FriendsTabContents" tabid="FriendsTab" group="people_list_tabs" hittest="false" selected="true">
-					<CitadelFriendsList id="FriendsList" />
-				</TabContents>
-				<TabContents id="PlayersTabContents" tabid="PlayersTab" group="people_list_tabs" hittest="false">
-					<CitadelPlayersList id="PlayersList" />
-				</TabContents>
-			</Panel>
-		</Panel>
-	</CitadelHudEscapeMenu>
+	</Panel>
+	</Panel>
 </root>

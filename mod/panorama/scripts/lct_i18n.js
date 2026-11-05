@@ -2,7 +2,7 @@
 // ------------------------------------------------------------------
 // 纯数据、零逻辑:不碰 DOM、不注册事件、不读配置(与 v2 lingua_chat_i18n.js 同法,
 // QOLLOCK LocalizeSettingsText 同型:查表翻译 + 未命中回退原文)。
-// 装载顺序契约:必须在 lct_settings_ui.vjs_c **之前**加载(hud_escape_menu.xml
+// 装载顺序契约:必须在 lct_settings_ui.vjs_c **之前**加载(hud.xml
 // 的 <scripts> 顺序,Panorama 按声明序执行 —— v2 生产实证)。
 // 共享机制:Panorama 无模块系统,本文件用**无声明赋值**把数据挂到全局:
 //   LCT_TEXT_I18N     —— 文案表:中文原文 -> 英文。zh 是源语言;消费方把键值

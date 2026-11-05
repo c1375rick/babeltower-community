@@ -1,10 +1,12 @@
-/* BabelTower v3 — 设置窗口样式(Escape Menu shadow 专属)
-   样式由 hud_escape_menu.xml 的 <styles> include 激活 —— 与 UI 同 context 才生效
+/* BabelTower v3 — 设置页样式(HUD context)
+   样式由 lct_settings_page.xml 的 <styles> include 激活 —— 与 UI 同 context 才生效
    (QOLLOCK 生产实证:跨 context 样式从不依赖,样式必须跟面板同 layout)。
+   2026-11-05 迁移:页根 .LCTSettingsPage 规则在文件尾部(全屏背板 + 接管 .LCTOpen)。
    审查修订:控件等高 48×24、箭头钉右缘、滑块过渡、菜单限高、展开态反馈、
    选中项底色、提示对比度、灰阶三档收敛 */
 
-/* ---- 窗口壳(静态声明于 hud_escape_menu.xml,打开/关闭 = .LCTOpen) ---- */
+/* ---- 窗口壳(静态声明于 lct_settings_page.xml;开关类 .LCTOpen 已由页根接管,
+   窗口自身可见性由页根后代规则强制,见文件尾部) ---- */
 .LCTSettingsWindow {
 	width: 640px;
 	height: 700px;
@@ -238,4 +240,22 @@
 	font-size: 12px;
 	margin-left: 8px;
 	vertical-align: center;
+}
+
+/* ---- 全屏设置页(2026-11-05 迁移:独立 XML + BLoadLayout,由 lct_boot.js 装载) ----
+   页根 = 全屏暗背板,接管 .LCTOpen(旧窗口自身的开关类);窗口标记原封不动,
+   旧 collapse 规则用后代选择器压过(两类选择器 specificity 0-2-0 > 0-1-0)。
+   样式经本页自己的 <styles> include 激活(跨 context 样式从不依赖,QOLLOCK 实证) */
+.LCTSettingsPage {
+	width: 100%;
+	height: 100%;
+	background-color: rgba(5, 8, 14, 0.92);
+	visibility: collapse;
+	z-index: 6000;
+}
+.LCTSettingsPage.LCTOpen {
+	visibility: visible;
+}
+.LCTSettingsPage .LCTSettingsWindow {
+	visibility: visible;
 }

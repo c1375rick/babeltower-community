@@ -12,8 +12,9 @@
 	 *         .MessageBody > #MessageSource(.ChannelName/.SenderName) + #MessageContents
 	 *         #MessageContents > .Text > Label(正文) | .Ping > #TargetHeroImage + #PingLabel(html="true")
 	 *       自己的消息:行内 .SenderLocalClient 面板(v2 另判 IsSelf 类,双判保留)
-	 *   - 钩子跑在 hud.xml context(chat.xml 是自定义面板实例、其布局脚本不执行——信标实证);
-	 *     跨 context 注入 Label 是 v2 生产实证形态(chat context 注入 HUD 顶栏行)。
+	 *   - 钩子跑在 chat.xml context(2026-11-05 窄面回归:零依赖探针实证 chat.xml
+	 *     布局脚本完整执行,d186fbb "不执行"判决系 $.Time 污染假阳性,已推翻);
+	 *     跨 context 注入 Label(HUD 顶栏行)是 v2 生产实证形态。
  *   - 扫描两处:聊天窗口 #ChatMessages + HUD 顶栏 Team1Chat/Team2Chat 的 #Messages
  *     (对局中不开聊天框也能看到译文;行解剖 2026-11-04 反编译实证,见 HUD_CHAT_IDS 注释)
 	 *

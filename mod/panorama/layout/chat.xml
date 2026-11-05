@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BabelTower Community v3 - 窄面架构 chat.xml 布局覆盖(2026-11-05 窄面回归)
+  底稿 = 当前游戏核心 pak01 panorama/layout/chat.vxml_c 反编译逐字原文
+  (Source2Viewer-CLI 20.1.0.0,2026-11-05 提取;与 v2 重建逐字一致 = 零漂移)。
+  仅追加(全部经 2026-11-05 chat-context 探针实证,[LCTPROBE]/[LCTPROBE2] M1-M6):
+    1. <scripts> 六件套:lc_protocol(协议,必须最先) → lc_chat(消息钩子,消费
+       globalThis.LCTBridge) → lct_i18n(纯数据) → lct_settings_ui(控件逻辑) →
+       lct_settings(开关宿主+Esc 语义) → lct_boot(Esc 按钮注入+页面装载,必须最后)。
+       六件套同住本布局的一个 JS context,globalThis 直达(旧 hud.xml shadow 同契约)。
+    2. 隐藏 CEF 面板 LCTNet:4x4px + opacity 0.01 + visibility:visible
+       (全 collapse/opacity 0 会让 CEF 暂停面板定时器,传输死;lct_net.css 实证)。
+    3. styles 增加 lct_net.vcss_c(面板 class 兜底)。
+  信标实证链:chat.xml 布局脚本在当前构建完整执行(eval/t+3s ChatMessages=FOUND/
+  t+8s alive 全中),SubOptions/BLoadLayout/CitadelHTMLPanel 均自 chat context 直达;
+  d186fbb "chat.xml 脚本不执行"系 $.Time boot bug 污染的假阳性,已推翻并存档。
+  注意:每次游戏更新后必须重新反编译比对原版 chat.vxml_c,任何结构漂移都可能
+  FATAL 崩游戏(v2 TargetHeroImage 9 连 crash 教训)。刷新流程见 docs/COMPATIBILITY.md。
+-->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/citadel_base_styles.vcss" />
+		<include src="s2r://panorama/styles/chat.vcss" />
+		<include src="s2r://panorama/styles/lct_net.vcss_c" />
+	</styles>
+	<scripts>
+		<include src="s2r://panorama/scripts/lc_protocol.vjs_c" />
+		<include src="s2r://panorama/scripts/lc_chat.vjs_c" />
+		<include src="s2r://panorama/scripts/lct_i18n.vjs_c" />
+		<include src="s2r://panorama/scripts/lct_settings_ui.vjs_c" />
+		<include src="s2r://panorama/scripts/lct_settings.vjs_c" />
+		<include src="s2r://panorama/scripts/lct_boot.vjs_c" />
+	</scripts>
+	<snippets>
+		<snippet name="ChatMessageSource">
+			<Panel>
+				<Label class="ChannelName" text="[{s:channel_name}]" />
+				<Label class="SenderName" text="{s:sender_name}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Text">
+			<Panel class="Text">
+				<Label text="{s:message_text}" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageContents_Ping">
+			<Panel class="Ping">
+				<Image id="TargetHeroImage" />
+				<Label id="PingLabel" text="{s:ping_text}" html="true" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_HeroImage">
+			<Panel class="SenderHeroImage">
+				<CitadelHeroImage id="HeroImage" heroimagestyle="small" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_AvatarImage">
+			<Panel class="SenderAvatarImage">
+				<CitadelAvatarImage id="AvatarImage" />
+			</Panel>
+		</snippet>
+		<snippet name="ChatMessageSender_LocalClient">
+			<Panel class="SenderLocalClient" />
+		</snippet>
+		<snippet name="ChatMessage">
+			<Panel class="ChatMessage Expired">
+				<Panel id="SenderImage" />
+				<Panel class="MessageBody">
+					<Panel id="MessageSource" />
+					<Panel id="MessageContents" />
+				</Panel>
+			</Panel>
+		</snippet>
+	</snippets>
+	<CitadelChat defaultfocus="ChatInput" hittest="false">
+		<Panel id="ChatLinesArea" hittest="false">
+			<Panel class="ChatLinesWrapper" hittest="false">
+				<Panel id="ChatMessages" hittest="false" />
+			</Panel>
+		</Panel>
+		<Label class="ChatDisabledLabel" text="#Citadel_Hud_ChatDisabled" hittest="false" />
+		<Panel id="ChatControls">
+			<Label id="ChatTargetLabel" text="#citadel_chat_placeholder" />
+			<TextEntry id="ChatInput" oninputsubmit="CitadelChatInputSubmitted();" onblur="CitadelChatInputBlur();" placeholder="" maxchars="1024" />
+		</Panel>
+		<CitadelHTMLPanel id="LCTNet" class="LCTNet" hittest="false" acceptsfocus="false" style="width: 4px; height: 4px; visibility: visible; opacity: 0.01;" />
+	</CitadelChat>
+</root>

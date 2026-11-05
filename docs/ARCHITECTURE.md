@@ -51,21 +51,23 @@ GitHub Pages 上的静态桥页面完成。
 
 | 文件 | context | 职责 |
 |---|---|---|
-| `mod/panorama/layout/hud.xml` | hud | 游戏当前版 `hud.vxml_c` 反编译底稿 + 仅追加 script include 与 LCTNet 样式引用 |
-| `mod/panorama/layout/hud_escape_menu.xml` | escape | 游戏 `hud_escape_menu.vxml_c` 反编译底稿 + 设置窗口壳(静态声明) + 菜单入口按钮 |
-| `mod/panorama/scripts/lc_protocol.js` | hud | 协议客户端：面板创建、SetURL/HTMLTitle 分片、hello/tr/store 超时状态机、选举、cfg 落盘、对外 `globalThis.LCTBridge` |
-| `mod/panorama/scripts/lc_chat.js` | hud | 消息钩子：聊天窗扫描 + HUD 顶栏扫描 + 出站翻译（详见 §4） |
-| `mod/panorama/scripts/lct_i18n.js` | escape | 界面文案表(zh/en)：无声明全局 `LCT_TEXT_I18N`/`LCT_STATUS_PREFIX`，纯数据零逻辑；必须先于 `lct_settings_ui.vjs_c` include（v2 `lingua_chat_i18n.js` 同法） |
-| `mod/panorama/scripts/lct_settings.js` | escape | 窗口宿主：开/关、Esc 兜底、背景点击（QOLLOCK 生产模式，XML oncancel 不可靠的实证见文件头） |
-| `mod/panorama/scripts/lct_settings_ui.js` | escape | 控件逻辑：读 `lct_cfg` 渲染、写回共享属性、下拉菜单、页脚状态灯；界面语言 `uiLang`(zh/en, 手选无自动探测)经双向查表填充全部静态文案/选项/状态文本 |
-| `mod/panorama/styles/lct_settings.css` | escape | 设置窗口样式（必须与 UI 同 context include 才生效） |
+| `mod/panorama/layout/chat.xml` | chat | 游戏 `chat.vxml_c` 反编译底稿(2026-11-05 S2V 20.1.0.0,零漂移) + 仅追加六脚本 include 与 LCTNet 面板/样式引用。**永不 shadow hud.xml**(窄面回归,见 §6 决策 2) |
+| `mod/panorama/scripts/lc_protocol.js` | chat | 协议客户端：面板创建、SetURL/HTMLTitle 分片、hello/tr/store 超时状态机、选举、cfg 落盘、对外 `globalThis.LCTBridge` |
+| `mod/panorama/scripts/lc_chat.js` | chat | 消息钩子：聊天窗扫描 + HUD 顶栏扫描 + 出站翻译（详见 §4） |
+| `mod/panorama/scripts/lct_i18n.js` | chat | 界面文案表(zh/en)：无声明全局 `LCT_TEXT_I18N`/`LCT_STATUS_PREFIX`，纯数据零逻辑；必须先于 `lct_settings_ui.vjs_c` include（v2 `lingua_chat_i18n.js` 同法） |
+| `mod/panorama/scripts/lct_settings.js` | chat | 窗口宿主：开/关、Esc 兜底、背景点击（QOLLOCK 生产模式，XML oncancel 不可靠的实证见文件头） |
+| `mod/panorama/scripts/lct_settings_ui.js` | chat | 控件逻辑：读 `lct_cfg` 渲染、写回共享属性、下拉菜单、页脚状态灯；界面语言 `uiLang`(zh/en, 手选无自动探测)经双向查表填充全部静态文案/选项/状态文本 |
+| `mod/panorama/styles/lct_settings.css` | chat | 设置窗口样式（必须与 UI 同 context include 才生效） |
 | `mod/panorama/styles/lct_net.css` | hud | LCTNet 隐藏面板：`opacity:0.01` + `visibility:visible`（CEF 会暂停不可见面板的定时器） |
 | `app/d2a3dde88d180e5b/index.html` | CEF | 桥页面：协议实现 + 翻译上游 + store；CSP 仅本源 + 两个免 Key 上游；不写 console；localStorage 仅收 `lct:` 前缀键 |
 | `mod/build.ps1` | 本机 | 同步源码 → resourcecompiler → vpkeditcli 打包（§7） |
 
-关键约束：**脚本上下文即面板树**。chat.xml 是游戏的自定义面板实例，其布局脚本
-不执行（信标实证），所以所有逻辑只能住在 hud.xml / hud_escape_menu.xml 两个
-context；对 `#ChatInput` 等游戏面板的跨 context 访问已被收消息管线长期实证。
+关键约束：**脚本上下文即面板树**。全部逻辑住 chat.xml context（2026-11-05 窄面
+回归：零依赖探针实证 chat.xml 布局脚本完整执行——`[LCTPROBE] eval / t+3s
+ChatMessages=FOUND / t+8s alive` 三信号全中——d186fbb 的"不执行"判决系
+`$.Time` boot bug 污染的假阳性，已推翻并存档）。对 HUD 顶栏
+`Team1Chat/Team2Chat`、Esc 菜单 `SubOptions`、绝对根面板等游戏树的跨 context
+访问由探针 M3/M4 与 v2 生产实证（根爬链 + `FindChildTraverse`）。
 
 ## 4. 三条翻译管线
 
@@ -145,18 +147,23 @@ API 在本 build 的实证：DLMusic/QOLLOCK 反编译源同款用法；替换�
 | # | 决策 | 证据 | 失败形态（当时的最大风险） |
 |---|---|---|---|
 | 1 | 桥接架构（远程静态页 + CEF 面板） | 6726 版本把声明层外部 URL 清零、JS 网络通道全灭（census）；`CitadelHTMLPanel` 的 SetURL/HTMLTitle 是 probe 实测唯一存活通道 | 无网络 → 全功能不可用（已排除） |
-| 2 | 不 shadow chat.xml，逻辑全住 hud.xml | chat.xml 是游戏自定义面板实例，其布局脚本不执行（信标实证）；且 shadow 漂移 = 整个聊天 FATAL | 收不到消息 → 改用 hud context 轮询 DOM（v2 生产同款） |
+| 2 | **窄面回归**：只 shadow chat.xml，永不碰 hud.xml（2026-11-05 推翻旧决策） | 旧"chat.xml 脚本不执行"判决系 $.Time 污染假阳性——零依赖探针三信号全中，M1-M6 证明 SubOptions/BLoadLayout/CitadelHTMLPanel 全部 chat context 可达（`_compat/probe/` 存档）；窄面 = 与 QOL/任何 hud mod 文件面零交集，合并包整类退役 | shadow 漂移 = 聊天 FATAL（v2 TargetHeroImage 教训）→ 每次游戏更新重反编译比对（chat.xml 头注释 + COMPATIBILITY §7） |
 | 3 | `$.Time()` 不可用，全部 `nowMs()` 守卫 | 6726 后 `$.Time` 缺失致 boot TypeError（探针实证） | 协议全死 → Date.now 封装 |
-| 4 | 协议单实例跑 hud context | escape 的隐藏 context 实例同样能赢选举，但主角色落在不可控的隐藏树 | 双实例互踢 → 选举保留作互斥兜底 |
+| 4 | 协议单实例跑 chat.xml context（2026-11-05 起随窄面回归） | LCTNet 由 chat.xml XML 声明（4x4px/opacity 0.01/visible 生产隐藏配方，探针 M6 实证 CEF 传输）；选举保留作多 context 互斥兜底 | 双实例互踢 → 选举兜底 |
 | 5 | 出站钩子 = 跨 context `SetPanelEvent("oninputsubmit")` | DLMusic/QOLLOCK 反编译同款 API；替换语义活体实证 | 钩子不生效 → 出站静默失效，收消息不受影响 |
 | 6 | 发送配方 = poker 的 input.text + DispatchEvent | `references/poker_chat_debug.js` flushRequestedChat 生产在跑 | 双发/吞消息 → 活体验证恰好一条 |
 | 7 | 设置窗口静态声明 + 属性通道 | QOLLOCK 反编译：BLoadLayout 0 次、被隐藏窗口占 MenuBack 焦点使 XML oncancel 失效 | 设置不可交互 → XML 兜底 + `$.LCTUI*` 守卫 |
 | 8 | 诊断走 condebug 日志不上屏 | `$.Msg` → `game\citadel\console.log` 活体验证（`[PanoramaScript] [LCT]` 行） | 玩家可见调试残留 → 已拆除画面信标 |
 | 9 | 布局底稿逐字对齐当前游戏反编译 | 每次游戏更新都需重比（hud.xml 头注释写明维护纪律） | HUD 全灭 → 构建前 diff |
 
-历史包袱说明：v2（`F:\BabelTower`）靠 chat.xml/hudchat.xml shadow + BTIPC 直连，
-6726 后全灭。v3 的架构差异都是**从那堆废墟里长出来的**，v2 源码保留作为移植参照
-（HUD 扫描 ~3485-3600 行、出站 ~3690-3930 行）。
+历史包袱说明（2026-11-05 修订）：v2（`F:\BabelTower`）靠 chat.xml/hudchat.xml
+shadow + BTIPC 直连，**实际健康运行至 11-01 16:59**（btipc 时代构建 6726，客户端
+会话落盘为证）。当年"6726 后全灭"的判断被 2026-11-05 零依赖探针推翻：chat.xml
+脚本从不执行是假阳性（宣判 commit d186fbb 09:29 所依据的信标自带必崩的
+`$.Time` bug，而修复 986e3d7 在 10:07——宣判在修复前 38 分钟，证据链倒挂）。
+v3 从 v2 继承的真正教训是 shadow 漂移纪律与 API 不猜测原则；窄面回归后 v3 的
+chat.xml shadow 与 v2 形态殊途同归。v2 源码保留作为移植参照（HUD 扫描
+~3485-3600 行、出站 ~3690-3930 行）。
 
 ## 7. 构建与部署工作流
 
@@ -166,12 +173,12 @@ API 在本 build 的实证：DLMusic/QOLLOCK 反编译源同款用法；替换�
 ```
 1. 语法门禁   node --check mod/panorama/scripts/*.js
 2. 构建       powershell -ExecutionPolicy Bypass -File mod\build.ps1
-              [1/3] mod/ → CSDK content/citadel_addons/lctskeleton
+              [1/3] mod/ → CSDK content/citadel_addons/lctnarrow
               [2/3] resourcecompiler → .vxml_c/.vjs_c/.vcss_c
-              [3/3] vpkeditcli → dist/pak91_dir.vpk（输出树里确认文件数）
+              [3/3] vpkeditcli → dist/pak03_dir.vpk（输出树里确认文件数）
 3. 部署窗口   Get-Process project8,deadlock —— 游戏运行中则推迟
               （运行中覆盖 VPK 会导致资源系统读到半截文件）
-4. 部署       Copy dist\pak91_dir.vpk →
+4. 部署       Copy dist\pak03_dir.vpk →
               C:\SteamLibrary\steamapps\common\Deadlock\game\citadel\addons\
 5. 提交       commit message 写进 C:\Users\kali1\AppData\Local\Temp\opencode\
               lc_commit_msg.txt 再 git commit -F（多段 message 的既有做法）

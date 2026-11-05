@@ -9,8 +9,8 @@
 	 *   下行  $.RegisterEventHandler("HTMLTitle", panel, ...)     —— LCT3A/R/C/E 四帧
 	 * 面板:chat.xml / hudchat.xml 声明的隐藏 CitadelHTMLPanel(id=LCTNet,probe 实证形态)
 	 *
-	 * 单实例运行于 hud.xml context(对局常驻可见树;escape 菜单的 include 已移除:
- * 实测隐藏 context 的实例同样能赢得选举,但主角色落在隐藏树不可控)。
+	 * 单实例运行于 chat.xml context(2026-11-05 窄面回归:脚本执行由零依赖探针实证,
+ * LCTNet 面板由本布局 XML 声明,4x4px/opacity 0.01 生产隐藏配方)。
  * 选举机制保留(根面板 root 属性):若未来多 context 并存,自动恢复互斥。
 	 *   lct_proto_owner / lct_proto_beat —— claim 后下一 tick 确认才上任,防止同帧双 claim。
 	 *   只有 primary 驱动面板;落选者与 primary 通过同一组状态属性对外表现一致。
@@ -26,7 +26,7 @@
 	 *   getCfg() -> object                        当前会话配置(canonical 后)
 	 *
 	 * 配置所有权:本文件持有 canonical 配置,发布在共享面板属性 lct_cfg(#Hud/root);
-	 * 设置窗口(hud_escape_menu.xml 的 lct_settings_ui.js)直读直写该属性,
+	 * 设置窗口(lct_settings_page.xml 的 lct_settings_ui.js)直读直写该属性,
 	 * cfgWatchTick 监听外部变更 → 采纳 + store.put。状态文本/构建号同样发布在
 	 * 共享属性 lct_status / lct_buildid,跨 context 只走属性,不走 JS 全局。
 	 */
