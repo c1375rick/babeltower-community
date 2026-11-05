@@ -961,6 +961,6 @@
 		outHookWarned: false
 	};
 
-	log("loaded (hud context message hook)");
+	log("loaded (chat context message hook)");
 	boot(0);
 })();
