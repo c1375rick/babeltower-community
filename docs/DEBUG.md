@@ -59,6 +59,13 @@ controls bound: toggles=3 selects=6 options=24 [MISSED=N]
 先于 applyTexts 的时序倒挂），此时对应下拉的选项点了没反应。开关和
 点击动作本身无独立日志——判"控件死活"以本行为准。
 
+`[LCT][TabUI] markSelected: <key>=<value> hits=0` 是高亮失配自报：菜单
+"当前值"高亮按"选项文本 ↔ localizeText(LABELS 值)"匹配，零命中 = 选项
+文本与判据串不同语言（典型：界面语言切换瞬间，旧文本还没按新语言重
+填——2026-11-06 实测：pick 路径先 render 后 applyTexts，切语言各爆一次
+三键 hits=0，下一拍 poll render 自愈）。只影响高亮，不影响选择本身；
+反复出现即本地化时序回退，按 INTEGRATION.md §3.3 诚实账② 排查。
+
 ### 探针标签（历史实验，生产包不产生）
 
 `[LCTPROBE]` / `[LCTPROBE2]` 来自 `_compat/probe/` 两代信标（2026-11-05 窄面

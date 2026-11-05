@@ -318,13 +318,16 @@
 	exportFn("LCTUIPick", function (key, val, label) {
 		if (!cfg || !SELECTS[key]) { return; }
 		cfg[key] = (key === "timeoutMs") ? Number(val) : val;
+		// 界面语言变更:先按新语言重填静态文案/菜单选项,再 render —— 顺序不能反:
+		// 反了 markSelected 拿新语言 wantLabel 对旧语言选项文本,高亮瞬断一拍
+		// (2026-11-06 00:30:57/59 实测:切 en/切回 zh 各爆一次三键 hits=0,
+		// 自愈于下一次 poll render;轮询路径本就先 applyTexts 后 render,仅此处颠倒)
+		if (key === "uiLang") { applyTexts(); }
 		const lbl = findById(SELECTS[key].label);
 		if (lbl) { lbl.text = label || val; }
 		closeAllMenus();
 		render();
 		writeCfg();
-		// 界面语言变更:静态文案/菜单选项全部按新语言重填(render 只覆盖选择框标签)
-		if (key === "uiLang") { applyTexts(); }
 	});
 
 	exportFn("LCTUICloseAllMenus", closeAllMenus);
