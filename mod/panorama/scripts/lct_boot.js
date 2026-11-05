@@ -135,6 +135,9 @@
 		if (closeBtn) {
 			try { closeBtn.SetPanelEvent("onactivate", function () { closePage(); }); } catch (e2) {}
 		}
+		// Build 10931 实测(2026-11-05):内联 onactivate 不再解析到装载者 context,
+		// 全部控件(开关/下拉/选项)由 lct_settings_ui.LCTUIBindControls 确定性绑定。
+		try { if (typeof $.LCTUIBindControls === "function") $.LCTUIBindControls(); } catch (eB) {}
 	}
 
 	function loadPage() {

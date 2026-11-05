@@ -331,6 +331,57 @@
 	// lct_boot.js 消费:注入按钮/装载页面后重刷静态文案(按钮标签 LCTTxtMenuEntry 等)
 	exportFn("LCTUIApplyTexts", applyTexts);
 
+	// Build 10931 实测(2026-11-05 21:35 会话):BLoadLayout 内联 onactivate 不再
+	// 解析到装载者 context("内联跟随装载者"假设死亡,见 docs/INTEGRATION.md §7)
+	// —— 32 个内联控件(3 开关+5 下拉+24 选项)静默失灵,X/背板等 SetPanelEvent
+	// 绑定的控件全部正常。全部控件改由本函数确定性绑定,lct_boot.bindPageHandlers
+	// 在页面装载后调用。菜单选项按"选项当前文本 ↔ localizeText(LABELS 值)"同源
+	// 匹配(与 markSelected 同一判据,不赌子节点顺序);未命中数入日志自报。
+	exportFn("LCTUIBindControls", function () {
+		let boundToggles = 0;
+		for (const key in TOGGLES) {
+			if (!TOGGLES.hasOwnProperty(key)) { continue; }
+			const btn = findById(TOGGLES[key]);
+			if (!btn) { continue; }
+			try { btn.SetPanelEvent("onactivate", function () { $.LCTUIToggle(key); }); boundToggles++; } catch (e0) {}
+		}
+		let boundSelects = 0, boundOptions = 0, missedOptions = 0;
+		for (const skey in SELECTS) {
+			if (!SELECTS.hasOwnProperty(skey)) { continue; }
+			const btn = findById(SELECTS[skey].btn);
+			if (btn) {
+				try { btn.SetPanelEvent("onactivate", function () { $.LCTUIMenu(skey); }); boundSelects++; } catch (e1) {}
+			}
+			const menu = findById(SELECTS[skey].menu);
+			if (!menu) { continue; }
+			let n = 0;
+			try { n = menu.GetChildCount(); } catch (e2) { n = 0; }
+			for (let i = 0; i < n; i++) {
+				let opt = null;
+				try { opt = menu.GetChild(i); } catch (e3) { opt = null; }
+				if (!opt) { continue; }
+				let optText = "";
+				try {
+					const lbl = (opt.GetChildCount && opt.GetChildCount() > 0) ? opt.GetChild(0) : null;
+					if (lbl && typeof lbl.text === "string") { optText = lbl.text; }
+				} catch (e4) {}
+				let hitVal = null, hitLabel = "";
+				const map = LABELS[skey] || {};
+				for (const v in map) {
+					if (!map.hasOwnProperty(v)) { continue; }
+					const localized = localizeText(map[v]);
+					if (optText === localized || (localized !== "" && optText.indexOf(localized) === 0)) {
+						hitVal = v; hitLabel = localized; break;
+					}
+				}
+				if (hitVal === null) { missedOptions++; continue; }
+				try { opt.SetPanelEvent("onactivate", function () { $.LCTUIPick(skey, hitVal, hitLabel); }); boundOptions++; } catch (e5) {}
+			}
+		}
+		log("controls bound: toggles=" + boundToggles + " selects=" + boundSelects + " options=" + boundOptions + (missedOptions > 0 ? " MISSED=" + missedOptions : ""));
+		return missedOptions === 0;
+	});
+
 	/* ---------- 轮询共享属性 ---------- */
 
 	function poll() {

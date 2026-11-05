@@ -2,14 +2,16 @@
 <!--
   BabelTower v3 — 全屏设置页(独立 XML,2026-11-05 迁移产物)
   迁移:设置窗口不再内嵌 Esc 菜单(hud_escape_menu.xml 已删除),改由 lct_boot.js
-  在 HUD context 运行时 BLoadLayout 本页 —— 单一构建适配原版/QOL/任何 esc mod,
-  零布局合并竞争。
+  在 chat.xml context 运行时 BLoadLayout 本页 —— 单一构建适配原版/QOL/任何
+  esc mod,零布局合并竞争。
   规则:
     1. 窗口标记 = 原 hud_escape_menu.xml LCTSettingsWindow 块逐字搬运,内部
        ID/class 一律不变(lct_settings_ui.js 的 findById/applyTexts/render 零改动可用)。
-    2. 本文件**零 <scripts>**:BLoadLayout 内联 onactivate 的 context 归属按
-       "内联跟随装载者(HUD context)"假设,处理器一律 $.X 存在性守卫(不炸任何
-       context);实测若内联失效,由 lct_boot.js 的 SetPanelEvent 确定性重绑兜底。
+    2. 本文件**零 <scripts> 零内联处理器**(2026-11-05 Build 10931 实测判决:
+       BLoadLayout 内联 onactivate 不再解析到装载者 context,32 个内联控件
+       静默失灵 —— "内联跟随装载者"假设作废,见 docs/INTEGRATION.md §7)。
+       全部控件行为由 lct_boot.bindPageHandlers → lct_settings_ui
+       .LCTUIBindControls 在装载后 SetPanelEvent 确定性绑定;本文件是纯声明树。
     3. 开/关 = 页根 .LCTOpen 类(见 lct_settings.css 尾部页根规则);Esc 语义由
        lct_settings.js 接管(页根 oncancel + escPoll),lct_boot.js 确定性绑定
        页根 onactivate(点暗背板收页)/关闭按钮/窗口空 onactivate(挡穿透)。
@@ -20,6 +22,9 @@
        panel with 'id' attribute, which is not permitted"),故页根外套一层无 id
        全屏 shim(hittest=false 不挡输入,子树寻址不受影响);带 id 的页根在 shim
        内,findById/FindChildTraverse 照常命中。
+    6. 菜单选项的值不写在 XML(内联已废):lct_settings_ui.js 的 LABELS 表是
+       值的唯一来源,选项按钮按"选项文本 ↔ localizeText(LABELS 值)"匹配绑定。
+       新增选项 = XML 加一行 Button + LABELS 加一个值,两处顺序无关。
 -->
 <root>
 	<styles>
@@ -28,12 +33,12 @@
 	</styles>
 	<Panel hittest="false" style="width: 100%; height: 100%;">
 		<Panel id="LCTSettingsPage" class="LCTSettingsPage" hittest="true">
-		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true" onactivate="">
+		<Panel id="LCTSettingsWindow" class="LCTSettingsWindow" hittest="true">
 			<Panel class="LCTHeader">
 				<Label id="LCTTxtTitle" class="LCTHeaderText" text="BABELTOWER 翻译" />
 				<Panel class="LCTHeaderSpacer" />
 				<Label id="LCTBuildId" class="LCTBuildId" text="" />
-				<Button id="LCTSettingsClose" class="LCTCloseBtn" onactivate="if ($.LCTCloseSettingsWindow) { $.LCTCloseSettingsWindow(); }">
+				<Button id="LCTSettingsClose" class="LCTCloseBtn">
 					<Label text="X" />
 				</Button>
 			</Panel>
@@ -45,7 +50,7 @@
 							<Label id="LCTTxtHintEnabled" class="LCTRowHint" text="关闭后所有消息保留原文" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTTglEnabled" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('enabled'); }">
+							<Button id="LCTTglEnabled" class="LCTToggle">
 								<Panel class="LCTToggleKnob" />
 							</Button>
 						</Panel>
@@ -59,21 +64,21 @@
 							<Label id="LCTTxtHintTarget" class="LCTRowHint" text="把别人的消息翻译成这个语言" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('targetLanguage'); }">
+							<Button id="LCTSelTarget" class="LCTSelect">
 								<Label id="LCTSelTargetLabel" class="LCTSelectLabel" text="简体中文" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuTarget" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','zh-Hans','简体中文'); }"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','zh-Hant','繁體中文'); }"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','en','English'); }"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','ja','日本語'); }"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','ko','한국어'); }"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','fr','Français'); }"><Label class="LCTMenuOptionLabel" text="Français (fr)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','de','Deutsch'); }"><Label class="LCTMenuOptionLabel" text="Deutsch (de)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('targetLanguage','es','Español'); }"><Label class="LCTMenuOptionLabel" text="Español (es)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="Français (fr)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="Deutsch (de)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="Español (es)" /></Button>
 					</Panel>
 				</Panel>
 
@@ -84,15 +89,15 @@
 							<Label id="LCTTxtHintDisplay" class="LCTRowHint" text="译文下方是否保留原文" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelDisplay" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('displayMode'); }">
+							<Button id="LCTSelDisplay" class="LCTSelect">
 								<Label id="LCTSelDisplayLabel" class="LCTSelectLabel" text="双语" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuDisplay" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('displayMode','bilingual','双语'); }"><Label class="LCTMenuOptionLabel" text="双语 (原文 + 译文)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('displayMode','translation_only','仅译文'); }"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="双语 (原文 + 译文)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
 					</Panel>
 				</Panel>
 
@@ -103,16 +108,16 @@
 							<Label id="LCTTxtHintOutgoing" class="LCTRowHint" text="把自己打的消息先翻成目标语言再发出" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelOutgoing" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoing'); }">
+							<Button id="LCTSelOutgoing" class="LCTSelect">
 								<Label id="LCTSelOutgoingLabel" class="LCTSelectLabel" text="关" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuOutgoing" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','off','关'); }"><Label class="LCTMenuOptionLabel" text="关 (发原文)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','translation','仅译文'); }"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoing','bilingual','双语'); }"><Label class="LCTMenuOptionLabel" text="双语 (原文 | 译文)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="关 (发原文)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="仅译文" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="双语 (原文 | 译文)" /></Button>
 					</Panel>
 				</Panel>
 
@@ -122,18 +127,18 @@
 							<Label id="LCTTxtRowOutTarget" class="LCTRowLabel" text="发送目标语言" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelOutTarget" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('outgoingTarget'); }">
+							<Button id="LCTSelOutTarget" class="LCTSelect">
 								<Label id="LCTSelOutTargetLabel" class="LCTSelectLabel" text="English" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuOutTarget" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','en','English'); }"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','zh-Hans','简体中文'); }"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','zh-Hant','繁體中文'); }"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','ja','日本語'); }"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('outgoingTarget','ko','한국어'); }"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="English (en)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="简体中文 (zh-Hans)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="繁體中文 (zh-Hant)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="日本語 (ja)" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="한국어 (ko)" /></Button>
 					</Panel>
 				</Panel>
 
@@ -144,7 +149,7 @@
 							<Label id="LCTTxtHintForce" class="LCTRowHint" text="跳过语言判断,一律翻译" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTTglForce" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('force'); }">
+							<Button id="LCTTglForce" class="LCTToggle">
 								<Panel class="LCTToggleKnob" />
 							</Button>
 						</Panel>
@@ -158,7 +163,7 @@
 							<Label id="LCTTxtHintTranslateOwn" class="LCTRowHint" text="自己发出的消息也显示译文" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTTglTranslateOwn" class="LCTToggle" onactivate="if ($.LCTUIToggle) { $.LCTUIToggle('translateOwn'); }">
+							<Button id="LCTTglTranslateOwn" class="LCTToggle">
 								<Panel class="LCTToggleKnob" />
 							</Button>
 						</Panel>
@@ -171,17 +176,17 @@
 							<Label id="LCTTxtRowTimeout" class="LCTRowLabel" text="翻译超时" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelTimeout" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('timeoutMs'); }">
+							<Button id="LCTSelTimeout" class="LCTSelect">
 								<Label id="LCTSelTimeoutLabel" class="LCTSelectLabel" text="8 秒" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuTimeout" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','4000','4 秒'); }"><Label class="LCTMenuOptionLabel" text="4 秒" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','8000','8 秒'); }"><Label class="LCTMenuOptionLabel" text="8 秒" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','12000','12 秒'); }"><Label class="LCTMenuOptionLabel" text="12 秒" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('timeoutMs','16000','16 秒'); }"><Label class="LCTMenuOptionLabel" text="16 秒" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="4 秒" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="8 秒" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="12 秒" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="16 秒" /></Button>
 					</Panel>
 				</Panel>
 
@@ -191,15 +196,15 @@
 							<Label id="LCTTxtRowUiLang" class="LCTRowLabel" text="界面语言" />
 						</Panel>
 						<Panel class="LCTRight">
-							<Button id="LCTSelUiLang" class="LCTSelect" onactivate="if ($.LCTUIMenu) { $.LCTUIMenu('uiLang'); }">
+							<Button id="LCTSelUiLang" class="LCTSelect">
 								<Label id="LCTSelUiLangLabel" class="LCTSelectLabel" text="中文" />
 								<Label class="LCTSelectArrow" text="▼" />
 							</Button>
 						</Panel>
 					</Panel>
 					<Panel id="LCTMenuUiLang" class="LCTMenu">
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('uiLang','zh','中文'); }"><Label class="LCTMenuOptionLabel" text="中文" /></Button>
-						<Button class="LCTMenuOption" onactivate="if ($.LCTUIPick) { $.LCTUIPick('uiLang','en','English'); }"><Label class="LCTMenuOptionLabel" text="English" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="中文" /></Button>
+						<Button class="LCTMenuOption"><Label class="LCTMenuOptionLabel" text="English" /></Button>
 					</Panel>
 				</Panel>
 
