@@ -241,6 +241,18 @@
 	margin-left: 8px;
 	vertical-align: center;
 }
+/* canary 终判按钮(临时,判决后与 XML 内联块一并移除) */
+.LCTCanaryBtn {
+	margin-left: auto;
+	padding: 1px 8px;
+	border: 1px solid rgba(138, 148, 166, 0.4);
+	border-radius: 3px;
+	vertical-align: center;
+}
+.LCTCanaryBtn Label {
+	color: #8a94a6;
+	font-size: 11px;
+}
 
 /* ---- 全屏设置页(2026-11-05 迁移:独立 XML + BLoadLayout,由 lct_boot.js 装载) ----
    页根 = 全屏暗背板,接管 .LCTOpen(旧窗口自身的开关类);窗口标记原封不动,

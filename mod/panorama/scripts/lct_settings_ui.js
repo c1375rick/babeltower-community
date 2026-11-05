@@ -331,10 +331,10 @@
 	// lct_boot.js 消费:注入按钮/装载页面后重刷静态文案(按钮标签 LCTTxtMenuEntry 等)
 	exportFn("LCTUIApplyTexts", applyTexts);
 
-	// Build 10931 实测(2026-11-05 21:35 会话):BLoadLayout 内联 onactivate 不再
-	// 解析到装载者 context("内联跟随装载者"假设死亡,见 docs/INTEGRATION.md §7)
-	// —— 32 个内联控件(3 开关+5 下拉+24 选项)静默失灵,X/背板等 SetPanelEvent
-	// 绑定的控件全部正常。全部控件改由本函数确定性绑定,lct_boot.bindPageHandlers
+	// 生产实测(2026-11-05 21:35 会话):BLoadLayout 页内联 onactivate 全灭
+	// (32:0),SetPanelEvent 绑定的控件全部正常;内联何时开始失效不可考
+	// (生产从未点过内联控件,"内联跟随装载者"假设从未在生产验证过,见
+	// docs/INTEGRATION.md §7)。全部控件改由本函数确定性绑定,lct_boot.bindPageHandlers
 	// 在页面装载后调用。菜单选项按"选项当前文本 ↔ localizeText(LABELS 值)"同源
 	// 匹配(与 markSelected 同一判据,不赌子节点顺序);未命中数入日志自报。
 	exportFn("LCTUIBindControls", function () {

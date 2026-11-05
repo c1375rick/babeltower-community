@@ -7,11 +7,13 @@
   规则:
     1. 窗口标记 = 原 hud_escape_menu.xml LCTSettingsWindow 块逐字搬运,内部
        ID/class 一律不变(lct_settings_ui.js 的 findById/applyTexts/render 零改动可用)。
-    2. 本文件**零 <scripts> 零内联处理器**(2026-11-05 Build 10931 实测判决:
-       BLoadLayout 内联 onactivate 不再解析到装载者 context,32 个内联控件
-       静默失灵 —— "内联跟随装载者"假设作废,见 docs/INTEGRATION.md §7)。
-       全部控件行为由 lct_boot.bindPageHandlers → lct_settings_ui
-       .LCTUIBindControls 在装载后 SetPanelEvent 确定性绑定;本文件是纯声明树。
+    2. 本文件**零 <scripts> 零内联处理器**(2026-11-05 生产实测:BLoadLayout
+       页内联 onactivate 全灭 32:0,SetPanelEvent 绑定全部正常;内联何时
+       开始失效不可考 —— 迁移日起生产从未点过内联控件,见
+       docs/INTEGRATION.md §7)。全部控件行为由 lct_boot.bindPageHandlers →
+       lct_settings_ui.LCTUIBindControls 在装载后 SetPanelEvent 确定性绑定;
+       本文件是纯声明树。唯一例外 = LCTCanaryInline(canary 终判用,
+       无守卫内联、不在绑定表,判决落定后整块移除)。
     3. 开/关 = 页根 .LCTOpen 类(见 lct_settings.css 尾部页根规则);Esc 语义由
        lct_settings.js 接管(页根 oncancel + escPoll),lct_boot.js 确定性绑定
        页根 onactivate(点暗背板收页)/关闭按钮/窗口空 onactivate(挡穿透)。
@@ -211,6 +213,13 @@
 				<Panel class="LCTFooter">
 					<Panel id="LCTDot" class="LCTDot" />
 					<Label id="LCTStatusText" class="LCTStatusText" text="未连接" />
+					<!-- canary 终判(临时):无守卫内联,不在 TOGGLES/SELECTS 绑定表,
+					     SetPanelEvent 不会覆盖它。点后看 console.log 的 [LCTX] 行;
+					     判决落定(INTEGRATION.md §7 归档)后整块移除。 -->
+					<Button id="LCTCanaryInline" class="LCTCanaryBtn"
+							onactivate="$.Msg('[LCTX] inline fired | $.LCTUIToggle=' + (typeof $ !== 'undefined' ? typeof $.LCTUIToggle : 'NO$') + ' | globalThis.LCTUIToggle=' + (typeof globalThis !== 'undefined' ? typeof globalThis.LCTUIToggle : 'NOGT'))">
+						<Label text="canary" />
+					</Button>
 				</Panel>
 			</Panel>
 		</Panel>
