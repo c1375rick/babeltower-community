@@ -184,6 +184,20 @@ visibility:visible**：全 collapse 或 opacity 0 会让 CEF **暂停面板定�
 不执行"，38 分钟后修复时间源才发现冤案，全程存档于 ARCHITECTURE §6）。
 全库统一 `Date.now()` 封装（QOLLOCK 生产同款，55 处零 $.Time）。
 
+### 3.11 跨 context 通道：ClientUI_FireOutput（外部文档引用，未实测）
+
+canary 判决（§7）确立 context 隔离是常态之后，跨 context 通信的完整
+地图需要补上官方通道：`ClientUI_FireOutput` 是**引擎声明的跨 context
+事件通道**——string payload，`$.DispatchEvent` 派发 /
+`$.RegisterForUnhandledEvent` 监听；**任意自定义事件名不可跨 context
+派发**，因此社区框架（UMM 等）全部共用这一条总线：消息靠 payload 内
+版本标记 + mod id 命名空间隔离，handler 必须容忍外来流量不炸
+（廉价 `indexOf` 预检 + try/catch 包 JSON.parse）。证据等级：UMM 文档
+白纸黑字（xaohs/universal-mod-manager，2026-11-06 引用），本仓库未实测
+——采纳前按 §6 纪律先探针。本仓库现行方案是自建属性桥（共享面板
+`SetAttributeString` + 0.25s 轮询，生产实证）；是否迁移到总线属未决
+设计，不因通道存在而轻动。
+
 ## 4. 采纳清单（搬到你的 mod）
 
 1. **确定你的窄面**：你的业务在游戏 UI 里最贴哪个布局？shadow 它
@@ -231,10 +245,34 @@ visibility:visible**：全 collapse 或 opacity 0 会让 CEF **暂停面板定�
 
 ## 7. 边界与未验证（诚实清单）
 
-- **脚本 context 的来源**：本模式的"窄面"依赖你的业务恰好有一个必拿的
-  布局（聊天类 = chat.xml）。纯功能 mod 若没有任何必需布局，如何合法
-  拿到脚本 context——**未验证**。候选：shadow 一个冷门/空载布局、
-  蹭现有 mod 的 context（耦合，不推荐）、或等社区出现共享宿主方案。
+- **脚本 context 的来源（纯功能 mod 的入口问题）**：本模式的"窄面"
+  依赖你的业务恰好有一个必拿的布局（聊天类 = chat.xml，且它是功能位
+  ——chat 钩子必须驻留 chat context，`#ChatMessages` 只有那里可达）。
+  纯功能 mod 没有必需布局，但 2026-11-06 的 canary 判决把"宿主"与
+  "入口"拆开了：**宿主（脚本/页面/样式）全部可以是新增文件**（BLoad 页
+  自带独立 context + v2 同文件实证 scripts 与内联同 context → "页即
+  宿主"工作假设；直接实验待做：页面加探针 `<scripts>` include 打一行
+  `[LCTX2]` 即可钉死）；**唯一必须 shadow 的是入口**——几行 include +
+  一次 BLoadLayout 的 bootstrap。入口纪律（工程化方向，未验证）：
+  ① 冷门度评估 = S2V 反编译确认近空载 + 候选 mod 的
+  `vpkeditcli --file-tree` 交叉比对；② 入口可冗余（幂等 election 已
+  实证双跑共存，两个领地互为备份，败者降级存活）；③ 争抢动力学：标的
+  从"功能命脉"（v2 合并地狱）贬值为"火种"（换入口 = 改一行重发），
+  烈度可控；④ 蹭现有 mod 的 context：context 隔离实证后**进一步降级**
+  ——蹭文件 = 逻辑跑在别人 context，耦合没变少；等价的解耦形态（宿主
+  加载你的页面、页面自带 scripts）要求宿主认识你，协调成本更高；
+  ⑤ pak 同路径覆盖方向未实证（一轮双 pak 实验可钉死，勿当玄学用）。
+- **生态设施现状（UMM，2026-11-06 评估）**：Universal Mod Manager
+  （xaohs）解决**设置层**——声明式 manifest（toggle/slider/select/
+  checks/group），UI 在其 dashboard，持久化跨重启（卸载 mod 不丢值），
+  优雅降级（UMM 缺席时声明的默认值站得住）；协议走 `ClientUI_FireOutput`
+  （§3.11），hello/register/set 三消息，mod id 命名空间隔离。**不解决
+  宿主层**：Integration 首句即 "Paste this into your own Panorama
+  script"——行为 mod 仍需自己的脚本入口。对入口争抢的意义：设置需求
+  移出游戏削减入场动机，且示范了比"合并入口文件"（v2 地狱复刻风险）
+  更轻的协作形态——共享总线 + 命名空间协议 + 粘贴即用。其 client
+  library 必须 vendor 而非跨 VPK include：**依赖缺席时跨 VPK include
+  硬失败拖死整个 layout**，与本文"样式自包含"规则同构。
 - **引擎版本耦合**：`SubOptions`/`ShowEscapeMenu`/`EscapeMenu`/z-index
   行为都是当前构建（2026-11-05）实证，Valve 改版即需复验（§6 探针
   就是为这个准备的）。
