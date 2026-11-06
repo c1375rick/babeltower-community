@@ -843,10 +843,13 @@
 					const items = res && res.items;
 					const tr = (res && res.ok && items && items.length &&
 						typeof items[0].t === "string") ? String(items[0].t).trim() : "";
-					if (!tr || tr === trimmed) {
+					// unchanged 判据含大小写不敏感:"gg"->"GG" 这类借词保形输出与原文
+					// 等效,双语拼接只会产出"gg | GG"视觉噪音(2026-11-06 生产实测)。
+					const trSame = !!tr && tr.toLowerCase() === trimmed.toLowerCase();
+					if (!tr || trSame) {
 						// 翻译不可用/超时/未变:原文照发,绝不吞(v2 生产教训)。
 						// 日志三分:no_response=回调没来 / 错误码 / unchanged|empty=桥正常但没实质翻译
-						log("out unavailable (" + (res ? (res.ok ? (tr === trimmed ? "unchanged" : "empty")
+						log("out unavailable (" + (res ? (res.ok ? (trSame ? "unchanged" : "empty")
 							: String(res.code || "error")) : "no_response") + ") -> original");
 						sendNow(trimmed);
 						return;
